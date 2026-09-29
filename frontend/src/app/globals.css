@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Light theme by default, dark theme via prefers-color-scheme.
+ * Brand colours are placeholders until the final brand guide is supplied.
+ */
+:root {
+  --background: #f7f6f3;
+  --surface: #ffffff;
+  --surface-muted: #f1efea;
+  --foreground: #16181d;
+  --muted: #5d6270;
+  --border: #e2dfd8;
+  --ring: #b08d57;
+
+  --brand: #14213d;          /* deep navy */
+  --brand-foreground: #ffffff;
+  --accent: #b08d57;         /* warm gold */
+  --accent-foreground: #16181d;
+
+  --success: #1f7a4d;
+  --success-soft: #e5f4ec;
+  --warning: #9a6200;
+  --warning-soft: #fdf3dc;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --info: #1d4ed8;
+  --info-soft: #e8efff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e1116;
+    --surface: #161a21;
+    --surface-muted: #1d222b;
+    --foreground: #ecedef;
+    --muted: #9aa1ad;
+    --border: #2a303b;
+    --ring: #d4b27a;
+
+    --brand: #d4b27a;
+    --brand-foreground: #111318;
+    --accent: #d4b27a;
+    --accent-foreground: #111318;
+
+    --success: #4cc38a;
+    --success-soft: #11291e;
+    --warning: #f0b43c;
+    --warning-soft: #2e2410;
+    --danger: #f97066;
+    --danger-soft: #331715;
+    --info: #7aa2ff;
+    --info-soft: #152040;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

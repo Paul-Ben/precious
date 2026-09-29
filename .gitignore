@@ -1,0 +1,24 @@
+# ---- Secrets (each app also has its own .gitignore) ----
+.env
+.env.*
+!.env.example
+
+# ---- Dependencies & build output ----
+node_modules/
+vendor/
+.next/
+
+# ---- Leftovers from the old two-repo layout / local tools (safe to delete) ----
+backend/.github/
+frontend/.github/
+Claude outputs/
+.kombai/
+
+# The master spec is kept at backend/docs/spec/master-spec.md
+/hotel_bar_unified_platform_master_spec.md
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
