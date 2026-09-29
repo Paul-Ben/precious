@@ -18,7 +18,7 @@ import { paymentKeys, paymentsApi } from "./api";
 
 export function ReceiptView({ number }: { number: string }) {
   return (
-    <RequirePermission permission={["payments.view", "reservations.view"]}>
+    <RequirePermission permission={["payments.view", "reservations.view", "bills.view"]}>
       <Inner number={number} />
     </RequirePermission>
   );
@@ -76,9 +76,13 @@ function Printable({ receipt: r }: { receipt: Receipt }) {
             {r.guest_email && <p className="text-xs text-muted">{r.guest_email}</p>}
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-muted">For reservation</p>
+            <p className="text-xs uppercase tracking-wider text-muted">{r.for.type === "bar_tab" ? "For bar bill" : "For reservation"}</p>
             <p className="font-mono font-medium">{r.for.number}</p>
-            <p className="text-xs text-muted">{formatStayDate(r.for.check_in, true)} → {formatStayDate(r.for.check_out, true)} · {r.for.nights} night{r.for.nights === 1 ? "" : "s"}</p>
+            {r.for.type === "bar_tab" ? (
+              <p className="text-xs text-muted">{r.for.table ?? "No table"}</p>
+            ) : (
+              <p className="text-xs text-muted">{formatStayDate(r.for.check_in ?? "", true)} → {formatStayDate(r.for.check_out ?? "", true)} · {r.for.nights} night{r.for.nights === 1 ? "" : "s"}</p>
+            )}
           </div>
         </section>
 
@@ -95,7 +99,7 @@ function Printable({ receipt: r }: { receipt: Receipt }) {
         </dl>
 
         <dl className="space-y-2 border-t border-border pt-5">
-          <div className="flex justify-between"><dt className="text-muted">Reservation total</dt><dd>{formatNaira(r.reservation_total, { kobo: true })}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">{r.for.type === "bar_tab" ? "Bill total" : "Reservation total"}</dt><dd>{formatNaira(r.reservation_total, { kobo: true })}</dd></div>
           <div className="flex justify-between"><dt className="text-muted">Paid to date</dt><dd>{formatNaira(r.total_paid_to_date, { kobo: true })}</dd></div>
           <div className="flex justify-between text-base font-bold"><dt>Balance</dt><dd>{formatNaira(r.balance_after, { kobo: true })}</dd></div>
         </dl>

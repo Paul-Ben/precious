@@ -6,6 +6,7 @@ use App\Domain\Payments\PaymentService;
 use App\Domain\Reservations\ReservationService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payments\StartPaymentRequest;
+use App\Models\BarTab;
 use App\Models\Payment;
 use App\Models\Reservation;
 use App\Support\ApiResponse;
@@ -71,6 +72,11 @@ class PaymentController extends Controller
                 'status' => $reservation->status->value,
                 'payment_status' => $reservation->payment_status->value,
                 'balance' => Money::toDecimal(max(0, $reservation->balanceMinor())),
+            ] : null,
+            'bar_tab' => $payment->payable instanceof BarTab ? [
+                'number' => $payment->payable->number,
+                'status' => $payment->payable->status->value,
+                'balance' => Money::toDecimal(max(0, $payment->payable->refresh()->balanceMinor())),
             ] : null,
         ]);
     }

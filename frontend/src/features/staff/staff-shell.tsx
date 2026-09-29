@@ -81,9 +81,9 @@ export function StaffShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr] print:block">
       {/* Desktop sidebar */}
-      <aside className="hidden border-r border-border bg-surface lg:flex lg:flex-col">
+      <aside className="hidden border-r print:hidden border-border bg-surface lg:flex lg:flex-col">
         <div className="py-5">{brand}</div>
         <div className="flex-1 overflow-y-auto px-3 pb-6">
           <NavLinks />
@@ -109,7 +109,7 @@ export function StaffShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur sm:px-6">
+        <header className="print:hidden sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur sm:px-6">
           <button
             type="button"
             onClick={() => setOpen(true)}

@@ -35,9 +35,12 @@ export function PaymentCallback() {
   if (check.isError) return <ErrorState error={check.error} onRetry={() => check.refetch()} />;
 
   const v = check.data;
-  const number = v.reservation?.number;
-  const hasToken = number ? !!bookingTokenStore.read(number) : false;
-  const backHref = number && hasToken ? `/book/confirmation/${encodeURIComponent(number)}` : "/account";
+  const tabNumber = v.bar_tab?.number;
+  const number = v.reservation?.number ?? tabNumber;
+  const token = number ? bookingTokenStore.read(number) : null;
+  const backHref = tabNumber
+    ? `/bar/pay/${encodeURIComponent(tabNumber)}${token ? `?token=${token}` : ""}`
+    : number && token ? `/book/confirmation/${encodeURIComponent(number)}` : "/account";
   const checks = queryClient.getQueryState(queryKey)?.dataUpdateCount ?? 1;
   const stillChecking = v.status === "PENDING" && checks < MAX_CHECKS;
 
@@ -83,7 +86,7 @@ export function PaymentCallback() {
 
         {number && (
           <Link href={backHref} className="inline-block text-sm font-semibold underline underline-offset-4">
-            {v.status === "SUCCESSFUL" ? "View your reservation" : "Back to your reservation"} ({number})
+            {tabNumber ? (v.status === "SUCCESSFUL" ? "View your bill" : "Back to your bill") : v.status === "SUCCESSFUL" ? "View your reservation" : "Back to your reservation"} ({number})
           </Link>
         )}
       </CardBody>

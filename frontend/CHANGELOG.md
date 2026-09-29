@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0] — 2026-10-02 — M3 Bar / POS
+
+### Added
+- Staff → Bar: table grid, open bill, touch menu with categories/search, cart with notes,
+  send to bar; running bill with delivery, cancel, payment, charge to room, discount,
+  email and print (bill / room-charge signature slip).
+- Staff → Bar queue: four-column live board (auto-refresh), sold-out switches.
+- Administration → Bar setup: categories, products, tables.
+- Public pay link `/bar/pay/{TAB-…}?token=…` using the existing Pay panel.
+- Receipts and payment result page understand bar bills.
+
 ## [0.4.0] — 2026-10-01 — M2c Check-in / stays / check-out
 
 ### Added

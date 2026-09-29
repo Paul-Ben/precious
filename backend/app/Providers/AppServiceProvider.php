@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Domain\Property\HotelSettings;
+use App\Models\BarTab;
 use App\Models\PersonalAccessToken;
 use App\Models\Property;
 use App\Models\Reservation;
@@ -33,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
         DB::prohibitDestructiveCommands($this->app->isProduction());
 
         // Short, stable names for polymorphic "what was paid for" columns.
-        Relation::morphMap(['reservation' => Reservation::class]);
+        Relation::morphMap(['reservation' => Reservation::class, 'bar_tab' => BarTab::class]);
 
         $this->configurePasswords();
         $this->configureAuthorization();

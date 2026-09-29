@@ -8,6 +8,7 @@ use App\Domain\Reservations\ReservationLedger;
 use App\Enums\RefundMethod;
 use App\Enums\RefundStatus;
 use App\Exceptions\BusinessRuleException;
+use App\Models\BarTab;
 use App\Models\DocumentSequence;
 use App\Models\Payment;
 use App\Models\Refund;
@@ -153,6 +154,13 @@ class RefundService
             if ($payment->payable_type === (new Reservation)->getMorphClass()) {
                 $reservation = Reservation::query()->whereKey($payment->payable_id)->lockForUpdate()->firstOrFail();
                 $this->ledger->debit($reservation, $locked);
+            }
+
+            if ($payment->payable_type === (new BarTab)->getMorphClass()) {
+                $tab = BarTab::query()->whereKey($payment->payable_id)->lockForUpdate()->firstOrFail();
+                $tab->forceFill([
+                    'amount_paid' => Money::toDecimal(max(0, Money::toMinor($tab->amount_paid) - Money::toMinor($locked->amount))),
+                ])->save();
             }
 
             $this->audit->record('refunds.completed', $locked, ['status' => 'APPROVED'], ['status' => 'COMPLETED'], [

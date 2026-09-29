@@ -3,6 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Amenity;
+use App\Models\BarCategory;
+use App\Models\BarProduct;
+use App\Models\BarTable;
 use App\Models\Property;
 use App\Models\Room;
 use App\Models\RoomType;
@@ -77,6 +80,35 @@ class DemoHotelSeeder extends Seeder
             );
         }
 
-        $this->command?->info('Sample room types, rooms and services created.');
+        // SAMPLE bar menu and tables - replace with the real menu and prices.
+        $menu = [
+            'Beer' => [['Star Lager', '1500.00'], ['Heineken', '2000.00'], ['Guinness Stout', '2000.00']],
+            'Cocktails' => [['Mojito', '6000.00'], ['Chapman', '4000.00'], ['Pina Colada', '6500.00']],
+            'Soft drinks' => [['Coca-Cola', '1000.00'], ['Bottled water', '800.00'], ['Fresh orange juice', '2500.00']],
+            'Wine & spirits' => [['House red (glass)', '5000.00'], ['Hennessy VS (shot)', '7000.00']],
+            'Small chops' => [['Peppered gizzard', '4500.00'], ['Suya platter', '6000.00'], ['Spring rolls (6)', '3500.00']],
+        ];
+
+        $i = 0;
+
+        foreach ($menu as $categoryName => $products) {
+            $category = BarCategory::query()->firstOrCreate(['property_id' => $property->id, 'name' => $categoryName], ['sort_order' => $i++]);
+
+            foreach ($products as $j => [$name, $price]) {
+                BarProduct::withTrashed()->firstOrCreate(
+                    ['property_id' => $property->id, 'name' => $name],
+                    ['category_id' => $category->id, 'price' => $price, 'sort_order' => $j]
+                );
+            }
+        }
+
+        foreach (range(1, 8) as $n) {
+            BarTable::query()->firstOrCreate(
+                ['property_id' => $property->id, 'name' => 'Table '.$n],
+                ['capacity' => $n <= 4 ? 4 : 6, 'area' => $n <= 5 ? 'Lounge' : 'Terrace', 'sort_order' => $n]
+            );
+        }
+
+        $this->command?->info('Sample room types, rooms, services, bar menu and tables created.');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Domain\Payments;
 
 use App\Domain\Property\HotelSettings;
+use App\Models\BarTab;
 use App\Models\DocumentSequence;
 use App\Models\Payment;
 use App\Models\Property;
@@ -68,6 +69,54 @@ class ReceiptService
                 'reservation_total' => Money::toDecimal($reservation->grandTotalMinor()),
                 'total_paid_to_date' => $reservation->amount_paid,
                 'balance_after' => Money::toDecimal(max(0, $reservation->balanceMinor())),
+                'received_by' => $payment->recordedBy?->name,
+            ],
+        ]);
+    }
+
+    /** Receipt for a bar bill payment. */
+    public function issueForTab(Payment $payment, BarTab $tab): Receipt
+    {
+        $property = Property::current();
+        $issuedAt = now();
+
+        return Receipt::create([
+            'number' => DocumentSequence::next('RCP', (int) $this->settings->today()->year, 6),
+            'payment_id' => $payment->id,
+            'issued_at' => $issuedAt,
+            'snapshot' => [
+                'hotel' => [
+                    'name' => $property->name,
+                    'legal_name' => $property->legal_name,
+                    'address' => collect([$property->address, $property->city, $property->state])->filter()->implode(', '),
+                    'phone' => $property->phone,
+                    'email' => $property->email,
+                ],
+                'issued_at' => $issuedAt->toIso8601String(),
+                'received_from' => $tab->customer_name,
+                'guest_email' => $payment->payer_email ?? $tab->customer_email,
+                'for' => [
+                    'type' => 'bar_tab',
+                    'number' => $tab->number,
+                    'table' => $tab->table?->name,
+                ],
+                'payment' => [
+                    'reference' => $payment->reference,
+                    'method' => $payment->method->value,
+                    'method_label' => $payment->method->label(),
+                    'gateway' => $payment->gateway,
+                    'channel' => $payment->channel,
+                    'external_reference' => $payment->external_reference,
+                    'purpose' => $payment->purpose->value,
+                    'paid_at' => ($payment->paid_at ?? $issuedAt)->toIso8601String(),
+                ],
+                'currency' => $payment->currency,
+                'amount' => $payment->amount,
+                'processing_fee' => $payment->customer_fee,
+                'total_charged' => $payment->charged_amount,
+                'reservation_total' => $tab->total,
+                'total_paid_to_date' => $tab->amount_paid,
+                'balance_after' => Money::toDecimal(max(0, $tab->balanceMinor())),
                 'received_by' => $payment->recordedBy?->name,
             ],
         ]);

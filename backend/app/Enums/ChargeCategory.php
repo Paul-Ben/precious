@@ -9,6 +9,7 @@ enum ChargeCategory: string
     case LateCheckout = 'LATE_CHECKOUT';
     case Adjustment = 'ADJUSTMENT';
     case Other = 'OTHER';
+    case Bar = 'BAR';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum ChargeCategory: string
             self::LateCheckout => 'Late check-out',
             self::Adjustment => 'Adjustment',
             self::Other => 'Other',
+            self::Bar => 'Bar',
         };
     }
 }

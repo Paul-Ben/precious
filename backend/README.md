@@ -5,7 +5,7 @@ This is the `backend/` folder of the `precious` monorepo; the Next.js app is in 
 
 **Status:** Milestone M2 complete — rooms, guests, reservations (M2a), online & desk payments,
 receipts, refunds (M2b), check-in, guest bill, services and check-out (M2c), on top of M1
-(auth, 2FA, RBAC, audit). Next: M3/M4 bar & POS.
+(auth, 2FA, RBAC, audit), and the bar / POS (M3). Next: M4 live updates (Reverb) and reports.
 
 | | |
 |---|---|
@@ -60,7 +60,7 @@ psql -U postgres -c "CREATE DATABASE precious;"
 psql -U postgres -c "CREATE DATABASE precious_testing;"
 
 php artisan migrate --seed
-php artisan db:seed --class=DemoHotelSeeder   # optional sample rooms and services (local only)
+php artisan db:seed --class=DemoHotelSeeder   # optional sample rooms, services, bar menu and tables (local only)
 php artisan storage:link                       # serves room photos from storage/app/public
 ```
 

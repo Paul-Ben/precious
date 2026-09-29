@@ -23,12 +23,20 @@ class PaymentReceiptNotification extends Notification
         $money = fn (string $v) => Money::format(Money::toMinor($v));
         $date = fn (string $d) => CarbonImmutable::parse($d)->format('D j M Y');
 
+        $isBar = ($s['for']['type'] ?? 'reservation') === 'bar_tab';
+
         $mail = (new MailMessage)
             ->subject("Payment received – {$s['for']['number']} ({$this->receipt->number})")
             ->greeting('Thank you'.($s['received_from'] ? ', '.$s['received_from'] : '').'!')
-            ->line("We have received your payment of **{$money($s['amount'])}** for reservation **{$s['for']['number']}**.")
-            ->line("Stay: {$date($s['for']['check_in'])} → {$date($s['for']['check_out'])} ({$s['for']['nights']} night".($s['for']['nights'] === 1 ? '' : 's').').')
-            ->line('Receipt number: **'.$this->receipt->number.'**')
+            ->line($isBar
+                ? "We have received your payment of **{$money($s['amount'])}** for bar bill **{$s['for']['number']}**".(($s['for']['table'] ?? null) ? " ({$s['for']['table']})" : '').'.'
+                : "We have received your payment of **{$money($s['amount'])}** for reservation **{$s['for']['number']}**.");
+
+        if (! $isBar) {
+            $mail->line("Stay: {$date($s['for']['check_in'])} → {$date($s['for']['check_out'])} ({$s['for']['nights']} night".($s['for']['nights'] === 1 ? '' : 's').').');
+        }
+
+        $mail->line('Receipt number: **'.$this->receipt->number.'**')
             ->line('Payment method: '.$s['payment']['method_label'].($s['payment']['channel'] ? ' ('.str_replace('_', ' ', $s['payment']['channel']).')' : ''));
 
         if (Money::toMinor($s['processing_fee']) > 0) {
@@ -39,8 +47,8 @@ class PaymentReceiptNotification extends Notification
 
         return $mail
             ->line($balance > 0
-                ? "Balance remaining: **{$money($s['balance_after'])}**, payable before or at check-out."
-                : 'Your reservation is fully paid.')
+                ? "Balance remaining: **{$money($s['balance_after'])}**".($isBar ? '.' : ', payable before or at check-out.')
+                : ($isBar ? 'Your bill is fully paid.' : 'Your reservation is fully paid.'))
             ->line('Please keep this email as your receipt. '.$s['hotel']['name'].($s['hotel']['phone'] ? ' · '.$s['hotel']['phone'] : ''));
     }
 }

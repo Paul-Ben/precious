@@ -77,6 +77,18 @@ row lock on the payment and the reservation, and only once (final-status check).
 | `folio_statements` | Final bill issued at check-out, frozen JSONB | unique `number` (`FOL-2026-00001`), one per reservation |
 | `reservations` (+) | `charges_total`, `checked_in_at`, `checked_out_at`, `checked_out_by`, `balance_at_checkout` | |
 
+## Tables (M3 — bar / POS)
+
+| Table | Purpose | Notable constraints |
+|---|---|---|
+| `bar_categories`, `bar_products` | Menu (prices before tax) | unique names per property; `price ≥ 0`; products soft-deleted |
+| `bar_tables` | Tables | status CHECK, unique name |
+| `bar_tabs` | One visit's running bill | `TAB-YYYY-NNNNN`; status/settlement CHECKs; `total = subtotal − discount + service_charge + vat`, `discount ≤ subtotal`; encrypted pay-link token |
+| `bar_orders`, `bar_order_items` | Rounds sent to the bar, with price snapshots | `ORD-YYYY-NNNNNN`; status CHECK; `line_total = unit_price × quantity` |
+| `reservation_charges` (+) | `bar_tab_id`; category `BAR` added | |
+
+Payments for bar bills reuse `payments`/`receipts` with `payable_type = 'bar_tab'`.
+
 ## Migration order
 
 ```text
@@ -96,9 +108,10 @@ row lock on the payment and the reservation, and only once (final-status check).
 2026_09_29_000600  reservations, reservation_rooms (+ exclusion constraint), reservation_guests
 2026_09_30_000100  payments, receipts, refunds, webhook_events
 2026_10_01_000100  services, stays, reservation_charges, folio_statements (+ grants checkouts.override_balance to Hotel Manager)
+2026_10_02_000100  bar_categories, bar_products, bar_tables, bar_tabs, bar_orders, bar_order_items (+ BAR charge category)
 ```
 
-Next (M3/M4): bar products, tables, orders; charge-to-room onto open `stays`. The `btree_gist` extension needs a superuser/owner the first time (`postgres` locally;
+Next (M4): Reverb realtime; (M5+) staff, inventory, finance. The `btree_gist` extension needs a superuser/owner the first time (`postgres` locally;
 Railway's default role has the rights).
 
 ## Seeders

@@ -64,6 +64,14 @@ No test calls the real Paystack/Flutterwave APIs (`Http::fake`).
 
 Stay tests freeze time (`travelTo`) at fixed hotel-time moments so late fees are deterministic.
 
+## Added in M3 (+16 tests, 191 total)
+
+| Suite | Covers |
+|---|---|
+| `Feature/Bar/BarOrderFlowTest` | Open bill, order totals (P19), running-bill email (P20), walk-ins, sold out, bartender queue flow + permissions, P21 cancelling, P22 discounts, role checks |
+| `Feature/Bar/BarSettlementTest` | Close rules (pending orders, balance), desk payment + receipt + cash-up, empty bill, P9 charge to room (surname/room checks, hotel bill line), customer pay link via Paystack |
+| `Feature/Bar/BarCatalogTest` | Menu and tables admin, waiter read-only, table with open bill |
+
 ## Conventions
 
 * One behaviour per test, named as a sentence.

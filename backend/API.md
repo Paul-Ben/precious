@@ -227,3 +227,29 @@ The gateway redirects to `FRONTEND_URL/pay/callback` (Paystack adds `reference`/
 Reservations now return `charges_total`, `grand_total` (= `total` + `charges_total`), `charges`,
 and for staff `stays`, `checked_in_at`, `checked_out_at`, `balance_at_checkout`, `folio_number`.
 `balance` includes charges.
+
+## Endpoints (M3 — bar / POS)
+
+All staff routes are under `/bar`.
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/bar/menu` | `bar.products.view` or `bar.orders.create` — active categories with products |
+| GET / POST / PATCH / DELETE | `/bar/categories[/{id}]`, `/bar/products[/{id}]` | view: `bar.products.view`; change: `bar.products.manage` |
+| PATCH | `/bar/products/{id}/availability` | `bar.products.manage` or `bar.orders.prepare` — `{is_available}` |
+| GET / POST / PATCH / DELETE | `/bar/tables[/{id}]`, PATCH `/bar/tables/{id}/status` | `bar.tables.view` / `bar.tables.manage` |
+| GET | `/bar/tabs?status&table_id&mine&date` | `bar.orders.view` |
+| POST | `/bar/tabs` | `bar.orders.create` — `{table_id?, customer_name?, customer_phone?, customer_email?}` |
+| GET / PATCH | `/bar/tabs/{uuid}` | `bar.orders.view` / `bar.orders.create` |
+| POST | `/bar/tabs/{uuid}/orders` | `bar.orders.create` — `{items: [{product_id, quantity, notes?}], notes?}` |
+| POST | `/bar/tabs/{uuid}/discount` | `discounts.apply` — `{amount, reason}` |
+| POST | `/bar/tabs/{uuid}/payments` | `payments.create` — cash / POS / transfer |
+| POST | `/bar/tabs/{uuid}/charge-to-room` | `bar.orders.charge_to_room` — `{room_number, surname}` |
+| POST | `/bar/tabs/{uuid}/close`, `/email` | `bar.orders.create` / `bar.orders.view` |
+| GET | `/bar/orders/queue` | `bar.orders.view` or `bar.orders.prepare` |
+| POST | `/bar/orders/{uuid}/status` | `ACCEPTED`/`PREPARING`/`READY`: `bar.orders.prepare`; `DELIVERED`: `bar.orders.deliver` |
+| POST | `/bar/orders/{uuid}/cancel` | see P21 — `{reason?}` |
+| GET | `/public/bar-tabs/{TAB-…}?token=` · `/payment-options` · POST `/payments` | customer pay link (token from the email) |
+
+Error codes: `TAB_CLOSED`, `TABLE_BLOCKED`, `TABLE_IN_USE`, `PRODUCT_UNAVAILABLE`, `ORDERS_PENDING`,
+`BALANCE_DUE`, `PARTLY_PAID`, `NOTHING_DUE`, `ROOM_GUEST_MISMATCH`, `REASON_REQUIRED`, `CATEGORY_IN_USE`, `BAR_CHARGE`.

@@ -443,7 +443,7 @@ export interface Payment {
   recorded_by?: { id: string; name: string } | null;
   refundable?: Money;
   refunds?: { id: string; number: string; amount: Money; status: RefundStatus }[];
-  payable?: { type: "reservation"; id: string; number: string } | null;
+  payable?: { type: "reservation" | "bar_tab"; id: string; number: string } | null;
   guest?: { id: string; full_name: string } | null;
 }
 
@@ -481,6 +481,7 @@ export interface PaymentVerification {
   failure_reason: string | null;
   receipt_number: string | null;
   reservation: { number: string; status: ReservationStatus; payment_status: PaymentStatus; balance: Money } | null;
+  bar_tab?: { number: string; status: "OPEN" | "CLOSED" | "CANCELLED"; balance: Money } | null;
 }
 
 export interface Receipt {
@@ -491,7 +492,7 @@ export interface Receipt {
   hotel: { name: string; legal_name: string | null; address: string; phone: string | null; email: string | null };
   received_from: string | null;
   guest_email: string | null;
-  for: { type: "reservation"; number: string; check_in: string; check_out: string; nights: number };
+  for: { type: "reservation" | "bar_tab"; number: string; check_in?: string; check_out?: string; nights?: number; table?: string | null };
   payment: {
     reference: string;
     method: PaymentMethod;
@@ -555,7 +556,7 @@ export interface CashUp {
 
 // ------------------------------------------------------- Stays & folio (M2c)
 
-export type ChargeCategory = "SERVICE" | "EXTRA_NIGHT" | "LATE_CHECKOUT" | "ADJUSTMENT" | "OTHER";
+export type ChargeCategory = "SERVICE" | "EXTRA_NIGHT" | "LATE_CHECKOUT" | "ADJUSTMENT" | "OTHER" | "BAR";
 
 export interface Charge {
   id: string;
@@ -660,4 +661,99 @@ export interface FolioStatement extends BillSummary {
   hotel: { name: string; legal_name: string | null; address: string; phone: string | null; email: string | null };
   guest: { name: string | null; email: string | null; phone: string | null };
   reservation: { number: string; check_in: string; check_out: string; checked_in_at: string | null; checked_out_at: string };
+}
+
+// ------------------------------------------------------------------ Bar (M3)
+
+export type BarOrderStatus = "PLACED" | "ACCEPTED" | "PREPARING" | "READY" | "DELIVERED" | "CANCELLED";
+export type BarTableStatus = "AVAILABLE" | "OCCUPIED" | "RESERVED" | "CLEANING" | "BLOCKED";
+
+export interface BarProduct {
+  id: number;
+  category_id: number;
+  category?: string | null;
+  name: string;
+  description: string | null;
+  price: Money;
+  is_available: boolean;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface BarMenuCategory {
+  id: number;
+  name: string;
+  products: BarProduct[];
+}
+
+export interface BarCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  products_count?: number;
+}
+
+export interface BarTable {
+  id: number;
+  name: string;
+  capacity: number;
+  area: string | null;
+  status: BarTableStatus;
+  is_active: boolean;
+  sort_order: number;
+  open_tabs?: { id: string; number: string; customer_name: string | null; total: Money; opened_at: string | null }[];
+}
+
+export interface BarOrderItem {
+  id: number;
+  product_id: number | null;
+  name: string;
+  unit_price: Money;
+  quantity: number;
+  line_total: Money;
+  notes: string | null;
+}
+
+export interface BarOrder {
+  id: string;
+  number: string;
+  status: BarOrderStatus;
+  notes: string | null;
+  subtotal: Money;
+  waiter?: { id: string; name: string } | null;
+  tab?: { id: string; number: string; table: string | null; customer_name: string | null };
+  items?: BarOrderItem[];
+  placed_at: string | null;
+  accepted_at: string | null;
+  preparing_at: string | null;
+  ready_at: string | null;
+  delivered_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+}
+
+export interface BarTab {
+  id: string;
+  number: string;
+  status: "OPEN" | "CLOSED" | "CANCELLED";
+  settlement: "PAID" | "CHARGED_TO_ROOM" | null;
+  table?: { id: number; name: string } | null;
+  waiter?: { id: string; name: string } | null;
+  customer_name: string | null;
+  customer_phone?: string | null;
+  customer_email?: string | null;
+  subtotal: Money;
+  discount: Money;
+  discount_reason?: string | null;
+  service_charge: Money;
+  vat: Money;
+  total: Money;
+  amount_paid: Money;
+  balance: Money;
+  charged_to?: { room: string | null; reservation_id: string | null };
+  opened_at: string | null;
+  closed_at: string | null;
+  orders?: BarOrder[];
+  payments?: Payment[];
 }

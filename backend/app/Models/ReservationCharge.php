@@ -13,7 +13,7 @@ class ReservationCharge extends Model
     use HasUuids;
 
     protected $fillable = [
-        'reservation_id', 'stay_id', 'service_id', 'category', 'description', 'quantity', 'unit_price',
+        'reservation_id', 'stay_id', 'service_id', 'bar_tab_id', 'category', 'description', 'quantity', 'unit_price',
         'subtotal', 'service_charge', 'vat', 'total', 'status', 'reason', 'created_by', 'voided_at',
         'voided_by', 'void_reason',
     ];

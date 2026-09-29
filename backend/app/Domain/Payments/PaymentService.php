@@ -12,6 +12,7 @@ use App\Enums\PaymentPurpose;
 use App\Enums\ReservationStatus;
 use App\Enums\TransactionStatus;
 use App\Exceptions\BusinessRuleException;
+use App\Models\BarTab;
 use App\Models\Payment;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Property;
@@ -67,7 +68,6 @@ class PaymentService
     {
         $reason = $this->unpayableReason($reservation);
         $passFees = (bool) $this->settings->get('pass_gateway_fees_to_customer');
-        $enabled = $this->gateways->enabled();
 
         $options = [];
 
@@ -81,15 +81,7 @@ class PaymentService
                         default => Money::toMinor($reservation->amount_paid) > 0 ? 'Pay balance' : 'Pay in full',
                     },
                     'amount' => Money::toDecimal($minor),
-                    'by_gateway' => $enabled->map(function (PaymentGatewaySetting $setting) use ($minor, $passFees) {
-                        $fee = $passFees ? FeeSchedule::forSetting($setting)->grossUp($minor) - $minor : 0;
-
-                        return [
-                            'gateway' => $setting->gateway,
-                            'fee' => Money::toDecimal($fee),
-                            'total' => Money::toDecimal($minor + $fee),
-                        ];
-                    })->values()->all(),
+                    'by_gateway' => $this->gatewayLines($minor),
                 ];
             }
         }
@@ -99,13 +91,35 @@ class PaymentService
             'reason' => $reason ?? ($options === [] ? 'Nothing is due on this reservation.' : null),
             'fees_passed_to_customer' => $passFees,
             'options' => $options,
-            'gateways' => $enabled->map(fn (PaymentGatewaySetting $s) => [
-                'gateway' => $s->gateway,
-                'name' => $s->display_name ?: GatewayRegistry::get($s->gateway)['name'],
-                'is_default' => $s->is_default,
-                'test_mode' => $s->mode->value === 'test',
-            ])->values()->all(),
+            'gateways' => $this->gatewayList(),
         ];
+    }
+
+    /** @return list<array{gateway: string, fee: string, total: string}> */
+    private function gatewayLines(int $minor): array
+    {
+        $passFees = (bool) $this->settings->get('pass_gateway_fees_to_customer');
+
+        return $this->gateways->enabled()->map(function (PaymentGatewaySetting $setting) use ($minor, $passFees) {
+            $fee = $passFees ? FeeSchedule::forSetting($setting)->grossUp($minor) - $minor : 0;
+
+            return [
+                'gateway' => $setting->gateway,
+                'fee' => Money::toDecimal($fee),
+                'total' => Money::toDecimal($minor + $fee),
+            ];
+        })->values()->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function gatewayList(): array
+    {
+        return $this->gateways->enabled()->map(fn (PaymentGatewaySetting $s) => [
+            'gateway' => $s->gateway,
+            'name' => $s->display_name ?: GatewayRegistry::get($s->gateway)['name'],
+            'is_default' => $s->is_default,
+            'test_mode' => $s->mode->value === 'test',
+        ])->values()->all();
     }
 
     /**
@@ -218,12 +232,24 @@ class PaymentService
 
         $reservation->loadMissing('guest');
 
+        return $this->startCheckout($payment, $setting, [
+            'email' => $payment->payer_email,
+            'name' => $reservation->guest?->fullName() ?? 'Guest',
+            'phone' => $reservation->guest?->phone,
+            'description' => 'Reservation '.$reservation->number,
+        ]);
+    }
+
+    /**
+     * Creates the hosted checkout for a PENDING payment.
+     *
+     * @param  array{email: string, name: string, phone: ?string, description: string}  $customer
+     */
+    private function startCheckout(Payment $payment, PaymentGatewaySetting $setting, array $customer): Payment
+    {
         try {
             $result = $this->gateways->driver($setting->gateway)->initialize($payment, $setting, [
-                'email' => $payment->payer_email,
-                'name' => $reservation->guest?->fullName() ?? 'Guest',
-                'phone' => $reservation->guest?->phone,
-                'description' => 'Reservation '.$reservation->number,
+                ...$customer,
                 'callback_url' => config('security.frontend_url').'/pay/callback',
             ]);
         } catch (GatewayException $e) {
@@ -366,6 +392,10 @@ class PaymentService
      */
     private function credit(Payment $payment, ?User $actor): Receipt
     {
+        if ($payment->payable_type === (new BarTab)->getMorphClass()) {
+            return $this->creditTab($payment, $actor);
+        }
+
         /** @var Reservation $reservation */
         $reservation = Reservation::query()->whereKey($payment->payable_id)->lockForUpdate()->firstOrFail();
 
@@ -573,6 +603,189 @@ class PaymentService
             });
 
         return ['verified' => $verified, 'abandoned' => $abandoned];
+    }
+
+    // ------------------------------------------------------------- Bar tabs
+
+    /**
+     * Pay-link options for a bar tab: the outstanding balance, per gateway.
+     *
+     * @return array{payable: bool, reason: ?string, fees_passed_to_customer: bool, options: list<array<string, mixed>>, gateways: list<array<string, mixed>>}
+     */
+    public function tabOptions(BarTab $tab): array
+    {
+        $balance = $tab->balanceMinor();
+        $reason = match (true) {
+            ! $tab->isOpen() => 'This bill is closed.',
+            $balance <= 0 => 'Nothing is due on this bill.',
+            default => null,
+        };
+
+        return [
+            'payable' => $reason === null,
+            'reason' => $reason,
+            'fees_passed_to_customer' => (bool) $this->settings->get('pass_gateway_fees_to_customer'),
+            'options' => $reason === null ? [[
+                'option' => 'balance',
+                'purpose' => Money::toMinor($tab->amount_paid) > 0 ? PaymentPurpose::Balance->value : PaymentPurpose::Full->value,
+                'label' => 'Pay bill',
+                'amount' => Money::toDecimal($balance),
+                'by_gateway' => $this->gatewayLines($balance),
+            ]] : [],
+            'gateways' => $this->gatewayList(),
+        ];
+    }
+
+    public function initiateForTab(BarTab $tab, ?string $gateway, ?string $email = null, ?User $actor = null): Payment
+    {
+        $setting = $this->gateways->choose($gateway);
+
+        $payment = DB::transaction(function () use ($tab, $setting, $email, $actor) {
+            /** @var BarTab $locked */
+            $locked = BarTab::query()->whereKey($tab->id)->lockForUpdate()->firstOrFail();
+            $minor = $locked->balanceMinor();
+
+            if (! $locked->isOpen() || $minor <= 0) {
+                throw new BusinessRuleException('This bill has nothing left to pay.', 'NOT_PAYABLE', 409);
+            }
+
+            $payerEmail = $email ?: $locked->customer_email;
+
+            if (! $payerEmail) {
+                throw new BusinessRuleException('An email address is needed to pay online.', 'EMAIL_REQUIRED', 422);
+            }
+
+            $fee = $this->settings->get('pass_gateway_fees_to_customer')
+                ? FeeSchedule::forSetting($setting)->grossUp($minor) - $minor
+                : 0;
+
+            $payment = Payment::create([
+                'reference' => 'PAY-'.Str::upper((string) Str::ulid()),
+                'property_id' => $locked->property_id,
+                'payable_type' => $locked->getMorphClass(),
+                'payable_id' => $locked->id,
+                'method' => PaymentMethod::Gateway,
+                'gateway' => $setting->gateway,
+                'gateway_mode' => $setting->mode,
+                'purpose' => Money::toMinor($locked->amount_paid) > 0 ? PaymentPurpose::Balance : PaymentPurpose::Full,
+                'status' => TransactionStatus::Pending,
+                'currency' => config('hotel.currency'),
+                'amount' => Money::toDecimal($minor),
+                'customer_fee' => Money::toDecimal($fee),
+                'charged_amount' => Money::toDecimal($minor + $fee),
+                'payer_email' => $payerEmail,
+            ]);
+
+            $this->audit->record('payments.initiated', $payment, null, [
+                'reference' => $payment->reference,
+                'bar_tab' => $locked->number,
+                'gateway' => $setting->gateway,
+                'amount' => $payment->amount,
+                'customer_fee' => $payment->customer_fee,
+            ], [], $actor);
+
+            return $payment;
+        });
+
+        return $this->startCheckout($payment, $setting, [
+            'email' => $payment->payer_email,
+            'name' => $tab->customer_name ?: 'Guest',
+            'phone' => $tab->customer_phone,
+            'description' => 'Bar bill '.$tab->number,
+        ]);
+    }
+
+    /**
+     * Cash, POS or transfer taken at the table.
+     *
+     * @param  array{method: string, amount: string, external_reference?: ?string, note?: ?string, send_receipt?: bool}  $data
+     */
+    public function recordManualForTab(BarTab $tab, array $data, User $actor): Payment
+    {
+        $method = PaymentMethod::from($data['method']);
+
+        if ($method === PaymentMethod::Gateway) {
+            throw new BusinessRuleException('Online payments are recorded automatically.', 'INVALID_METHOD', 422);
+        }
+
+        $minor = Money::toMinor($data['amount']);
+
+        [$payment, $receipt] = DB::transaction(function () use ($tab, $data, $method, $minor, $actor) {
+            /** @var BarTab $locked */
+            $locked = BarTab::query()->whereKey($tab->id)->lockForUpdate()->firstOrFail();
+            $balance = $locked->balanceMinor();
+
+            if (! $locked->isOpen()) {
+                throw new BusinessRuleException('This bill is closed.', 'NOT_PAYABLE', 409);
+            }
+
+            if ($minor <= 0 || $minor > $balance) {
+                throw new BusinessRuleException(
+                    'The amount must be between ₦0.01 and the balance of '.Money::format(max(0, $balance)).'.',
+                    'INVALID_AMOUNT',
+                    422,
+                    ['balance' => Money::toDecimal(max(0, $balance))]
+                );
+            }
+
+            $payment = Payment::create([
+                'reference' => 'PAY-'.Str::upper((string) Str::ulid()),
+                'property_id' => $locked->property_id,
+                'payable_type' => $locked->getMorphClass(),
+                'payable_id' => $locked->id,
+                'method' => $method,
+                'purpose' => $minor === $balance ? (Money::toMinor($locked->amount_paid) > 0 ? PaymentPurpose::Balance : PaymentPurpose::Full) : PaymentPurpose::Part,
+                'status' => TransactionStatus::Successful,
+                'currency' => config('hotel.currency'),
+                'amount' => Money::toDecimal($minor),
+                'customer_fee' => '0.00',
+                'charged_amount' => Money::toDecimal($minor),
+                'external_reference' => $data['external_reference'] ?? null,
+                'note' => $data['note'] ?? null,
+                'payer_email' => $locked->customer_email,
+                'paid_at' => now(),
+                'recorded_by' => $actor->id,
+            ]);
+
+            $this->audit->record('payments.recorded', $payment, null, [
+                'method' => $method->value,
+                'amount' => $payment->amount,
+            ], ['bar_tab' => $locked->number], $actor);
+
+            return [$payment, $this->credit($payment, $actor)];
+        });
+
+        if ((bool) ($data['send_receipt'] ?? true)) {
+            $this->receipts->email($receipt);
+        }
+
+        return $payment->refresh();
+    }
+
+    private function creditTab(Payment $payment, ?User $actor): Receipt
+    {
+        /** @var BarTab $tab */
+        $tab = BarTab::query()->whereKey($payment->payable_id)->lockForUpdate()->firstOrFail();
+        $paid = Money::toMinor($tab->amount_paid) + Money::toMinor($payment->amount);
+        $tab->forceFill(['amount_paid' => Money::toDecimal($paid)])->save();
+
+        $attention = match (true) {
+            ! $tab->isOpen() => 'TAB_ALREADY_SETTLED',
+            $paid > Money::toMinor($tab->total) => 'OVERPAYMENT',
+            default => null,
+        };
+
+        if ($attention !== null) {
+            $payment->forceFill(['needs_attention' => true, 'attention_reason' => $attention])->save();
+        }
+
+        $this->audit->record('payments.succeeded', $payment, null, [
+            'status' => 'SUCCESSFUL',
+            'amount' => $payment->amount,
+            'method' => $payment->method->value,
+        ], array_filter(['reference' => $payment->reference, 'bar_tab' => $tab->number, 'attention' => $attention]), $actor);
+
+        return $this->receipts->issueForTab($payment->load('recordedBy'), $tab->load('table'));
     }
 
     /** Current property's payments for a reservation, newest first. */

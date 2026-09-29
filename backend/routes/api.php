@@ -2,6 +2,10 @@
 
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\Bar\CatalogController as BarCatalogController;
+use App\Http\Controllers\Api\V1\Bar\OrderController as BarOrderController;
+use App\Http\Controllers\Api\V1\Bar\TabController as BarTabController;
+use App\Http\Controllers\Api\V1\Bar\TableController as BarTableController;
 use App\Http\Controllers\Api\V1\Customer\ReservationController as CustomerReservationController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\Hotel\AmenityController;
@@ -19,6 +23,7 @@ use App\Http\Controllers\Api\V1\PaymentGatewaySettingsController;
 use App\Http\Controllers\Api\V1\Payments\PaymentController;
 use App\Http\Controllers\Api\V1\Payments\RefundController;
 use App\Http\Controllers\Api\V1\Payments\WebhookController;
+use App\Http\Controllers\Api\V1\Public\BarTabController as PublicBarTabController;
 use App\Http\Controllers\Api\V1\Public\CatalogController;
 use App\Http\Controllers\Api\V1\Public\PaymentController as PublicPaymentController;
 use App\Http\Controllers\Api\V1\Public\ReservationController as PublicReservationController;
@@ -54,6 +59,10 @@ Route::prefix('public')->name('public.')->middleware('throttle:public')->group(f
         ->where('number', '[A-Z]{3}-\d{4}-\d{3,10}')->middleware('throttle:booking-lookup')->name('reservations.payment-options');
     Route::post('reservations/{number}/payments', [PublicPaymentController::class, 'store'])
         ->where('number', '[A-Z]{3}-\d{4}-\d{3,10}')->middleware('throttle:payments')->name('reservations.payments.store');
+    // Bar bill pay link (TAB number + token from the bill email).
+    Route::get('bar-tabs/{number}', [PublicBarTabController::class, 'show'])->where('number', 'TAB-\d{4}-\d{3,10}')->middleware('throttle:booking-lookup')->name('bar-tabs.show');
+    Route::get('bar-tabs/{number}/payment-options', [PublicBarTabController::class, 'options'])->where('number', 'TAB-\d{4}-\d{3,10}')->middleware('throttle:booking-lookup')->name('bar-tabs.payment-options');
+    Route::post('bar-tabs/{number}/payments', [PublicBarTabController::class, 'pay'])->where('number', 'TAB-\d{4}-\d{3,10}')->middleware('throttle:payments')->name('bar-tabs.payments.store');
     // Called by the /pay/callback page after the gateway redirects back.
     Route::post('payments/verify', [PublicPaymentController::class, 'verify'])->middleware('throttle:payments')->name('payments.verify');
 });
@@ -208,6 +217,41 @@ Route::middleware('throttle:api')->group(function () {
         Route::patch('services/{service}', [ServiceController::class, 'update'])->middleware('permission:services.manage')->whereNumber('service')->name('services.update');
         Route::delete('services/{service}', [ServiceController::class, 'destroy'])->middleware('permission:services.manage')->whereNumber('service')->name('services.destroy');
 
+        // Bar / POS (M3)
+        Route::prefix('bar')->name('bar.')->group(function () {
+            Route::get('menu', [BarCatalogController::class, 'menu'])->middleware('permission:bar.products.view|bar.orders.create')->name('menu');
+            Route::get('categories', [BarCatalogController::class, 'categories'])->middleware('permission:bar.products.view|bar.products.manage')->name('categories.index');
+            Route::post('categories', [BarCatalogController::class, 'storeCategory'])->middleware('permission:bar.products.manage')->name('categories.store');
+            Route::patch('categories/{category}', [BarCatalogController::class, 'updateCategory'])->middleware('permission:bar.products.manage')->whereNumber('category')->name('categories.update');
+            Route::delete('categories/{category}', [BarCatalogController::class, 'destroyCategory'])->middleware('permission:bar.products.manage')->whereNumber('category')->name('categories.destroy');
+            Route::get('products', [BarCatalogController::class, 'products'])->middleware('permission:bar.products.view|bar.products.manage')->name('products.index');
+            Route::post('products', [BarCatalogController::class, 'storeProduct'])->middleware('permission:bar.products.manage')->name('products.store');
+            Route::patch('products/{product}', [BarCatalogController::class, 'updateProduct'])->middleware('permission:bar.products.manage')->whereNumber('product')->name('products.update');
+            Route::patch('products/{product}/availability', [BarCatalogController::class, 'availability'])->middleware('permission:bar.products.manage|bar.orders.prepare')->whereNumber('product')->name('products.availability');
+            Route::delete('products/{product}', [BarCatalogController::class, 'destroyProduct'])->middleware('permission:bar.products.manage')->whereNumber('product')->name('products.destroy');
+
+            Route::get('tables', [BarTableController::class, 'index'])->middleware('permission:bar.tables.view|bar.tables.manage')->name('tables.index');
+            Route::post('tables', [BarTableController::class, 'store'])->middleware('permission:bar.tables.manage')->name('tables.store');
+            Route::patch('tables/{table}', [BarTableController::class, 'update'])->middleware('permission:bar.tables.manage')->whereNumber('table')->name('tables.update');
+            Route::patch('tables/{table}/status', [BarTableController::class, 'status'])->middleware('permission:bar.tables.manage|bar.orders.create')->whereNumber('table')->name('tables.status');
+            Route::delete('tables/{table}', [BarTableController::class, 'destroy'])->middleware('permission:bar.tables.manage')->whereNumber('table')->name('tables.destroy');
+
+            Route::get('tabs', [BarTabController::class, 'index'])->middleware('permission:bar.orders.view')->name('tabs.index');
+            Route::post('tabs', [BarTabController::class, 'store'])->middleware('permission:bar.orders.create')->name('tabs.store');
+            Route::get('tabs/{tab}', [BarTabController::class, 'show'])->middleware('permission:bar.orders.view')->name('tabs.show');
+            Route::patch('tabs/{tab}', [BarTabController::class, 'update'])->middleware('permission:bar.orders.create|bar.orders.update')->name('tabs.update');
+            Route::post('tabs/{tab}/orders', [BarTabController::class, 'placeOrder'])->middleware('permission:bar.orders.create')->name('tabs.orders.store');
+            Route::post('tabs/{tab}/discount', [BarTabController::class, 'discount'])->middleware('permission:discounts.apply')->name('tabs.discount');
+            Route::post('tabs/{tab}/payments', [BarTabController::class, 'pay'])->middleware('permission:payments.create')->name('tabs.payments.store');
+            Route::post('tabs/{tab}/charge-to-room', [BarTabController::class, 'chargeToRoom'])->middleware('permission:bar.orders.charge_to_room')->name('tabs.charge-to-room');
+            Route::post('tabs/{tab}/close', [BarTabController::class, 'close'])->middleware('permission:bar.orders.create|bar.orders.update')->name('tabs.close');
+            Route::post('tabs/{tab}/email', [BarTabController::class, 'email'])->middleware('permission:bar.orders.view')->name('tabs.email');
+
+            Route::get('orders/queue', [BarOrderController::class, 'queue'])->middleware('permission:bar.orders.view|bar.orders.prepare')->name('orders.queue');
+            Route::post('orders/{order}/status', [BarOrderController::class, 'advance'])->middleware('permission:bar.orders.prepare|bar.orders.deliver')->whereUuid('order')->name('orders.status');
+            Route::post('orders/{order}/cancel', [BarOrderController::class, 'cancel'])->middleware('permission:bar.orders.create|bar.orders.cancel')->whereUuid('order')->name('orders.cancel');
+        });
+
         // Payments & receipts
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view')->name('payments.index');
         Route::get('payments/summary', [PaymentController::class, 'summary'])->middleware('permission:payments.view')->name('payments.summary');
@@ -216,7 +260,7 @@ Route::middleware('throttle:api')->group(function () {
         Route::post('payments/{payment}/resolve', [PaymentController::class, 'resolve'])->middleware('permission:payments.refund')->whereUuid('payment')->name('payments.resolve');
         Route::get('reservations/{reservation}/payments', [PaymentController::class, 'forReservation'])->middleware('permission:payments.view|reservations.view')->whereUuid('reservation')->name('reservations.payments.index');
         Route::post('reservations/{reservation}/payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->whereUuid('reservation')->name('reservations.payments.store');
-        Route::get('receipts/{number}', [PaymentController::class, 'receipt'])->middleware('permission:payments.view|reservations.view')->where('number', 'RCP-\d{4}-\d{6,}')->name('receipts.show');
+        Route::get('receipts/{number}', [PaymentController::class, 'receipt'])->middleware('permission:payments.view|reservations.view|bills.view')->where('number', 'RCP-\d{4}-\d{6,}')->name('receipts.show');
         Route::post('receipts/{number}/email', [PaymentController::class, 'emailReceipt'])->middleware('permission:payments.view|payments.create')->where('number', 'RCP-\d{4}-\d{6,}')->name('receipts.email');
 
         // Refunds (P14: above the threshold a second person must approve)

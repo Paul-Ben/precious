@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\BarTab;
 use App\Models\Payment;
 use App\Models\Refund;
 use App\Models\Reservation;
@@ -64,11 +65,11 @@ class PaymentResource extends JsonResource
                     'amount' => $r->amount,
                     'status' => $r->status->value,
                 ])->values()),
-                'payable' => $this->payable instanceof Reservation ? [
-                    'type' => 'reservation',
-                    'id' => $this->payable->id,
-                    'number' => $this->payable->number,
-                ] : null,
+                'payable' => match (true) {
+                    $this->payable instanceof Reservation => ['type' => 'reservation', 'id' => $this->payable->id, 'number' => $this->payable->number],
+                    $this->payable instanceof BarTab => ['type' => 'bar_tab', 'id' => $this->payable->id, 'number' => $this->payable->number],
+                    default => null,
+                },
                 'guest' => $this->whenLoaded('guest', fn () => $this->guest ? ['id' => $this->guest->id, 'full_name' => $this->guest->fullName()] : null),
             ]),
         ];

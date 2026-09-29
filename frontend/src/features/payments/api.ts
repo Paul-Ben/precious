@@ -14,10 +14,10 @@ import type {
 type Q = Record<string, string | number | boolean | null | undefined>;
 
 /** Who is paying: a guest with their booking link, or a signed-in customer. */
-export type Payer = { kind: "guest"; number: string; token: string } | { kind: "customer"; id: string };
+export type Payer = { kind: "guest"; number: string; token: string } | { kind: "customer"; id: string } | { kind: "tab"; number: string; token: string };
 
 export const paymentKeys = {
-  options: (payer: Payer) => ["payments", "options", payer.kind === "guest" ? payer.number : payer.id] as const,
+  options: (payer: Payer) => ["payments", "options", payer.kind === "customer" ? payer.id : payer.number] as const,
   list: (f: Q = {}) => ["payments", "list", f] as const,
   payment: (id: string) => ["payments", "payment", id] as const,
   reservation: (id: string) => ["payments", "reservation", id] as const,
@@ -31,12 +31,16 @@ export const paymentsApi = {
   options: async (payer: Payer) =>
     (payer.kind === "guest"
       ? await api.get<PaymentOptions>(`public/reservations/${encodeURIComponent(payer.number)}/payment-options`, { token: payer.token })
-      : await api.get<PaymentOptions>(`me/reservations/${payer.id}/payment-options`)
+      : payer.kind === "tab"
+        ? await api.get<PaymentOptions>(`public/bar-tabs/${encodeURIComponent(payer.number)}/payment-options`, { token: payer.token })
+        : await api.get<PaymentOptions>(`me/reservations/${payer.id}/payment-options`)
     ).data,
   start: async (payer: Payer, option: string, gateway: string | null) =>
     (payer.kind === "guest"
       ? await api.post<Checkout>(`public/reservations/${encodeURIComponent(payer.number)}/payments`, { token: payer.token, option, gateway })
-      : await api.post<Checkout>(`me/reservations/${payer.id}/payments`, { option, gateway })
+      : payer.kind === "tab"
+        ? await api.post<Checkout>(`public/bar-tabs/${encodeURIComponent(payer.number)}/payments`, { token: payer.token, gateway })
+        : await api.post<Checkout>(`me/reservations/${payer.id}/payments`, { option, gateway })
     ).data,
   verify: async (reference: string) => (await api.post<PaymentVerification>("public/payments/verify", { reference })).data,
 

@@ -96,3 +96,22 @@ change before the milestone that needs it.
 | A27 | The late check-out fee is added once, at the rate that applies at the first check-out attempt; it can be waived with a reason (audited) | `StayService::settleLateFee` |
 | A28 | Services use the global service-charge (10 %) and VAT (7.5 %) rates, switchable per service. Reductions (adjustments) need `discounts.approve` and are entered tax-inclusive | `FolioService` |
 | A29 | Bill items can only be added or voided while the guest is in house; voided lines stay visible | `FolioService` |
+
+## Bar rules — confirmed 1 Oct 2026
+
+| # | Rule | Where |
+|---|---|---|
+| P19 | Menu prices are before tax: service charge (10 %) and VAT (7.5 %) are added on the bill, VAT on (items − discount + service charge) | `TabService::recalculate` |
+| P20 | With an email on the bill, the customer gets the running bill + secure pay link after each order, and the final bill on close | `BarBillNotification` |
+| P21 | A waiter can cancel their own order until the bar accepts it; after that only `bar.orders.cancel` (Hotel Manager and up), with a reason. Delivered items are not cancelled — use a discount | `TabService::cancelOrder` |
+| P22 | Bar discounts need `discounts.apply` (Hotel Manager, Administrator) and a reason; audited | `TabService::applyDiscount` |
+
+## Implemented in M3 on assumption
+
+| # | Assumption | Where |
+|---|---|---|
+| A30 | One bill (tab) per visit; several tabs may share a table; the table is freed when its last tab closes | `TabService` |
+| A31 | A bill can be closed only when every order is delivered or cancelled and nothing is owed; an empty bill is cancelled | `TabService::close` |
+| A32 | Charge to room needs `bar.orders.charge_to_room`, all orders delivered and nothing paid yet; the whole bill moves to the guest's hotel bill as a BAR line (not voidable there — use a reduction). The match is room number + any guest surname on a checked-in booking; errors don't reveal who is in a room | `TabService::chargeToRoom` |
+| A33 | Stock tracking stays off (P11); products have a sold-out switch that bartenders can use | `bar/products/{id}/availability` |
+| A34 | Live bartender/waiter updates poll every 4–10 s; Reverb push (events already emitted) is switched on in M4 | `BarOrderChanged` |

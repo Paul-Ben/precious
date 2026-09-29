@@ -177,7 +177,7 @@ export function BillCard({ r }: { r: Reservation }) {
               </dt>
               <dd className="flex items-center gap-1">
                 {formatNaira(c.total, { kobo: true })}
-                {inHouse && c.status === "ACTIVE" && can("bills.update") && (
+                {inHouse && c.status === "ACTIVE" && c.category !== "BAR" && can("bills.update") && (
                   <button type="button" aria-label={`Void ${c.description}`} className="rounded p-0.5 text-muted hover:bg-surface-muted hover:text-danger" onClick={() => setVoiding(c)}>
                     <X className="size-3.5" aria-hidden="true" />
                   </button>

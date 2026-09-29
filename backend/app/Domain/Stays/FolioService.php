@@ -105,6 +105,11 @@ class FolioService
                 throw new BusinessRuleException('This charge is already voided.', 'INVALID_STATUS', 422);
             }
 
+            if ($locked->category === ChargeCategory::Bar) {
+                // The bar bill is closed as "charged to room"; voiding here would leave it unbilled.
+                throw new BusinessRuleException('Bar charges cannot be voided here. Ask a manager to add a reduction instead.', 'BAR_CHARGE', 422);
+            }
+
             if ($reservation->status !== ReservationStatus::CheckedIn) {
                 throw new BusinessRuleException('The bill is closed; charges can only be voided while the guest is checked in.', 'NOT_IN_HOUSE', 409);
             }

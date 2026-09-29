@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0] — 2026-10-02 — M3 Bar / POS
+
+### Added
+- Bar menu (categories, products, sold-out switch), tables, touch-friendly waiter POS.
+- Bills (tabs) with several orders; bartender live queue (New → Accepted → Preparing → Ready);
+  waiter delivers.
+- Service charge + VAT on bar bills (P19), discounts (P22), order cancelling rules (P21).
+- Payments at the table (cash/POS/transfer) with receipts; customer pay link by email with
+  Paystack/Flutterwave (P20); charge to room by room number + surname onto the guest's hotel
+  bill with a printable signature slip (P9).
+- Payments service generalised for bar bills; bar money in the daily cash-up.
+- `BarOrderChanged` broadcast event (for Reverb in M4). 16 new tests (191 total).
+
 ## [0.4.0] — 2026-10-01 — M2c Check-in / stays / check-out
 
 ### Added
