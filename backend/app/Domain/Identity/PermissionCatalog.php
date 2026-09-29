@@ -48,6 +48,7 @@ final class PermissionCatalog
                 'reservations.cancel' => 'Cancel reservations',
                 'checkins.create' => 'Check guests in',
                 'checkouts.create' => 'Check guests out',
+                'checkouts.override_balance' => 'Check a guest out with an unpaid balance (P18)',
             ],
             'services' => [
                 'services.view' => 'View hotel services',

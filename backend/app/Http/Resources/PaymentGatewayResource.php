@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Payments\FeeSchedule;
 use App\Domain\Payments\GatewayRegistry;
 use App\Domain\Payments\PaymentGatewaySettingsService;
 use App\Enums\GatewayMode;
@@ -44,6 +45,9 @@ class PaymentGatewayResource extends JsonResource
                 'test' => $service->missingFields($this->gateway, $credentials, GatewayMode::Test),
                 'live' => $service->missingFields($this->gateway, $credentials, GatewayMode::Live),
             ],
+            // Processing fee used to work out what the payer is charged on top.
+            'fees' => FeeSchedule::valuesFor($this->resource),
+            'fee_defaults' => config('payments.default_fees.'.$this->gateway),
             'last_test' => $this->last_tested_at ? [
                 'tested_at' => $this->last_tested_at->toIso8601String(),
                 'mode' => $this->last_test_mode,

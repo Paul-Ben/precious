@@ -109,7 +109,18 @@ class PaymentGatewaySettingsService
             throw new BusinessRuleException('Only an enabled gateway can be the default.', 'GATEWAY_DISABLED', 422);
         }
 
-        return DB::transaction(function () use ($setting, $data, $credentials, $mode, $enabled, $default, $changedFields, $actor) {
+        $options = $setting->options ?? [];
+
+        if (array_key_exists('fees', $data)) {
+            // Validated: percent, flat, flat_waived_below, cap. null resets to the published default.
+            $options['fees'] = $data['fees'] === null ? null : FeeSchedule::fromArray(array_merge(
+                FeeSchedule::valuesFor($setting),
+                $data['fees'],
+            ))->toArray();
+            $options = array_filter($options, fn ($v) => $v !== null);
+        }
+
+        return DB::transaction(function () use ($setting, $data, $credentials, $mode, $enabled, $default, $changedFields, $actor, $options) {
             $before = $this->publicState($setting);
 
             if ($default) {
@@ -122,6 +133,7 @@ class PaymentGatewaySettingsService
                 'is_enabled' => $enabled,
                 'is_default' => $default,
                 'credentials' => $credentials,
+                'options' => $options === [] ? null : $options,
                 'updated_by' => $actor->getKey(),
             ])->save();
 
@@ -252,6 +264,7 @@ class PaymentGatewaySettingsService
             'mode' => $setting->mode?->value,
             'is_enabled' => $setting->is_enabled,
             'is_default' => $setting->is_default,
+            'fees' => FeeSchedule::valuesFor($setting),
         ];
     }
 }

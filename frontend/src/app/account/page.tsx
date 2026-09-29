@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/features/auth/change-password-form";
+import { MyReservations } from "@/features/booking/my-reservations";
 import { SignOutButton } from "@/features/auth/sign-out-button";
 import { APP_NAME } from "@/lib/config";
 import { getCurrentUser } from "@/lib/server/api";
@@ -38,8 +39,9 @@ export default async function AccountPage() {
       <main id="main" className="mx-auto max-w-4xl space-y-6 px-4 py-8">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Hello, {user.name.split(" ")[0]}</h1>
-          <p className="mt-1 text-sm text-muted">Your reservations, bills and receipts will appear here.</p>
+          <p className="mt-1 text-sm text-muted">Your reservations, bills and receipts.</p>
         </div>
+        <MyReservations />
         <Card>
           <CardHeader title="Profile" />
           <CardBody>

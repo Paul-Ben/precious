@@ -30,6 +30,13 @@ class UpdatePaymentGatewayRequest extends FormRequest
             'clear_credentials.*' => ['string', Rule::in(collect(['test', 'live'])->crossJoin($fields)->map(fn ($p) => implode('.', $p))->all())],
         ];
 
+        $money = ['nullable', 'string', 'regex:/^\d{1,9}(\.\d{1,2})?$/'];
+        $rules['fees'] = ['sometimes', 'nullable', 'array:percent,flat,flat_waived_below,cap'];
+        $rules['fees.percent'] = ['required_with:fees', 'string', 'regex:/^\d{1,2}(\.\d{1,4})?$/'];
+        $rules['fees.flat'] = $money;
+        $rules['fees.flat_waived_below'] = $money;
+        $rules['fees.cap'] = $money;
+
         foreach (['test', 'live'] as $mode) {
             foreach ($fields as $field) {
                 $rules["credentials.$mode.$field"] = ['nullable', 'string', 'max:255'];

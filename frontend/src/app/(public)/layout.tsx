@@ -10,6 +10,9 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
             {APP_NAME}
           </Link>
           <nav className="flex items-center gap-2 text-sm" aria-label="Main">
+            <Link href="/rooms" className="rounded-lg px-3 py-2 font-medium hover:bg-surface-muted">
+              Rooms
+            </Link>
             <Link href="/login" className="rounded-lg px-3 py-2 font-medium hover:bg-surface-muted">
               Sign in
             </Link>

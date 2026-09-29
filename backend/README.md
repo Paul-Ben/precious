@@ -3,8 +3,9 @@
 The authoritative business-logic layer for the Hotel & Bar Unified Management Platform.
 This is the `backend/` folder of the `precious` monorepo; the Next.js app is in `../frontend`.
 
-**Status:** Milestone M1 (Foundation) — API standards, authentication, email 2FA, RBAC,
-audit log, admin-configurable payment gateway keys, CI.
+**Status:** Milestone M2 complete — rooms, guests, reservations (M2a), online & desk payments,
+receipts, refunds (M2b), check-in, guest bill, services and check-out (M2c), on top of M1
+(auth, 2FA, RBAC, audit). Next: M3/M4 bar & POS.
 
 | | |
 |---|---|
@@ -59,7 +60,13 @@ psql -U postgres -c "CREATE DATABASE precious;"
 psql -U postgres -c "CREATE DATABASE precious_testing;"
 
 php artisan migrate --seed
+php artisan db:seed --class=DemoHotelSeeder   # optional sample rooms and services (local only)
+php artisan storage:link                       # serves room photos from storage/app/public
 ```
+
+Room photos go to `MEDIA_DISK` (default `public`) and ID documents to `DOCUMENTS_DISK`
+(default `local`, private). In staging/production set `MEDIA_DISK=r2_public` and
+`DOCUMENTS_DISK=r2_private`.
 
 Serve it with Herd. Because the app is nested in `precious\backend`, link it to a clean domain:
 
@@ -72,8 +79,23 @@ Background work (run in separate terminals while developing):
 
 ```powershell
 php artisan queue:listen --tries=1
-php artisan schedule:work
+php artisan schedule:work     # expires unpaid holds, marks no-shows, reconciles payments
 ```
+
+### Trying online payments locally
+
+1. Staff → Settings → Payment gateways: paste your **test** keys, enable, make one default.
+2. Book a room on the website and press **Pay**. You are sent to the gateway's test checkout -
+   use a test card from the gateway's docs (Paystack: paystack.com/docs/payments/test-payments,
+   Flutterwave: developer.flutterwave.com → Testing helpers).
+3. Returning to `/pay/callback` verifies the payment even without webhooks.
+4. Webhooks need a public URL. For local testing run a tunnel, e.g.
+   `cloudflared tunnel --url http://precious-api.test`, and paste
+   `<tunnel-url>/api/v1/webhooks/payments/paystack` into the gateway dashboard. Optional - the
+   `payments:reconcile` job also settles payments every 10 minutes.
+
+Do **not** turn on "pass fees to customer" inside the Paystack/Flutterwave dashboards - the
+platform already adds the processing fee (Property & policies → *Payer covers online payment fees*).
 
 `MAIL_MAILER=log` writes every email — including 2FA codes and temporary passwords — to
 `storage/logs/laravel.log`, so you can sign in locally without an email provider.

@@ -105,4 +105,39 @@ describe("BFF proxy", () => {
     expect(res.status).toBe(502);
     expect((await res.json()).code).toBe("UPSTREAM_UNAVAILABLE");
   });
+
+  it("forwards multipart uploads byte-for-byte", async () => {
+    cookieJar.set("hp_session", "abc");
+    const fetchMock = upstream({ success: true, message: "OK", data: {}, meta: {} }, 201);
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0x00, 0x10]);
+
+    await POST(
+      new NextRequest("http://app.test/api/bff/guests/x/documents", {
+        method: "POST",
+        headers: { origin: "http://app.test", host: "app.test", "content-type": "multipart/form-data; boundary=abc" },
+        body: bytes,
+      }),
+      ctx(["guests", "x", "documents"]),
+    );
+
+    const init = fetchMock.mock.calls[0]![1]!;
+    expect(new Uint8Array(init.body as ArrayBuffer)).toEqual(bytes);
+    expect(new Headers(init.headers).get("content-type")).toBe("multipart/form-data; boundary=abc");
+  });
+
+  it("streams file downloads through with their headers", async () => {
+    cookieJar.set("hp_session", "abc");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "Content-Type": "image/jpeg", "Content-Disposition": 'attachment; filename="PASSPORT-Doe.jpg"' },
+      }),
+    );
+
+    const res = await GET(new NextRequest("http://app.test/api/bff/guests/x/documents/y/download"), ctx(["guests", "x", "documents", "y", "download"]));
+
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("content-disposition")).toContain("PASSPORT-Doe.jpg");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
 });

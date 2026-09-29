@@ -73,7 +73,8 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     upstream = await fetch(upstreamUrl, {
       method,
       headers,
-      body: method === "GET" || method === "HEAD" ? undefined : await request.text(),
+      // Raw bytes, so multipart uploads (photos, ID documents) pass through intact.
+      body: method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer(),
       cache: "no-store",
       redirect: "manual",
     });
@@ -81,6 +82,18 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     const response = failure(502, "UPSTREAM_UNAVAILABLE", "The server is unreachable. Please try again shortly.");
     if (path === "auth/logout") clearSessionCookies(response);
     return response;
+  }
+
+  // Successful non-JSON responses (e.g. an ID document download) stream through untouched.
+  const contentType = upstream.headers.get("content-type") ?? "";
+  if (upstream.ok && !contentType.includes("application/json")) {
+    const passthrough = new NextResponse(upstream.body, { status: upstream.status });
+    for (const name of ["content-type", "content-disposition", "content-length"]) {
+      const value = upstream.headers.get(name);
+      if (value) passthrough.headers.set(name, value);
+    }
+    passthrough.headers.set("Cache-Control", "no-store, private");
+    return passthrough;
   }
 
   const text = await upstream.text();

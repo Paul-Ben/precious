@@ -2,8 +2,26 @@
 
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\Customer\ReservationController as CustomerReservationController;
 use App\Http\Controllers\Api\V1\HealthController;
+use App\Http\Controllers\Api\V1\Hotel\AmenityController;
+use App\Http\Controllers\Api\V1\Hotel\ChargeController;
+use App\Http\Controllers\Api\V1\Hotel\FolioController;
+use App\Http\Controllers\Api\V1\Hotel\FrontDeskController;
+use App\Http\Controllers\Api\V1\Hotel\GuestController;
+use App\Http\Controllers\Api\V1\Hotel\PropertyController;
+use App\Http\Controllers\Api\V1\Hotel\ReservationController;
+use App\Http\Controllers\Api\V1\Hotel\RoomController;
+use App\Http\Controllers\Api\V1\Hotel\RoomTypeController;
+use App\Http\Controllers\Api\V1\Hotel\ServiceController;
+use App\Http\Controllers\Api\V1\Hotel\StayController;
 use App\Http\Controllers\Api\V1\PaymentGatewaySettingsController;
+use App\Http\Controllers\Api\V1\Payments\PaymentController;
+use App\Http\Controllers\Api\V1\Payments\RefundController;
+use App\Http\Controllers\Api\V1\Payments\WebhookController;
+use App\Http\Controllers\Api\V1\Public\CatalogController;
+use App\Http\Controllers\Api\V1\Public\PaymentController as PublicPaymentController;
+use App\Http\Controllers\Api\V1\Public\ReservationController as PublicReservationController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +35,34 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('health', HealthController::class)->name('health');
+
+// ------------------------------------------------------------ Public website
+Route::prefix('public')->name('public.')->middleware('throttle:public')->group(function () {
+    Route::get('property', [CatalogController::class, 'property'])->name('property');
+    Route::get('room-types', [CatalogController::class, 'roomTypes'])->name('room-types.index');
+    Route::get('room-types/{slug}', [CatalogController::class, 'roomType'])->where('slug', '[a-z0-9-]+')->name('room-types.show');
+    Route::get('availability', [CatalogController::class, 'availability'])->name('availability');
+    Route::post('quote', [CatalogController::class, 'quote'])->name('quote');
+    Route::post('reservations', [PublicReservationController::class, 'store'])->middleware('throttle:booking')->name('reservations.store');
+    Route::get('reservations/{number}', [PublicReservationController::class, 'show'])
+        ->where('number', '[A-Z]{3}-\d{4}-\d{3,10}')
+        ->middleware('throttle:booking-lookup')
+        ->name('reservations.show');
+
+    // Online payment for guests (number + lookup token).
+    Route::get('reservations/{number}/payment-options', [PublicPaymentController::class, 'options'])
+        ->where('number', '[A-Z]{3}-\d{4}-\d{3,10}')->middleware('throttle:booking-lookup')->name('reservations.payment-options');
+    Route::post('reservations/{number}/payments', [PublicPaymentController::class, 'store'])
+        ->where('number', '[A-Z]{3}-\d{4}-\d{3,10}')->middleware('throttle:payments')->name('reservations.payments.store');
+    // Called by the /pay/callback page after the gateway redirects back.
+    Route::post('payments/verify', [PublicPaymentController::class, 'verify'])->middleware('throttle:payments')->name('payments.verify');
+});
+
+// ------------------------------------------------------ Gateway webhooks
+Route::post('webhooks/payments/{gateway}', WebhookController::class)
+    ->where('gateway', '[a-z]+')
+    ->middleware('throttle:webhooks')
+    ->name('webhooks.payments');
 
 Route::middleware('throttle:api')->group(function () {
 
@@ -42,6 +88,15 @@ Route::middleware('throttle:api')->group(function () {
                 ->middleware('two_factor')
                 ->name('password.change');
         });
+    });
+
+    // ------------------------------------------------------- Customer portal
+    Route::prefix('me')->name('me.')->middleware(['auth:sanctum', 'active', 'two_factor', 'password.changed'])->group(function () {
+        Route::get('reservations', [CustomerReservationController::class, 'index'])->name('reservations.index');
+        Route::get('reservations/{reservation}', [CustomerReservationController::class, 'show'])->whereUuid('reservation')->name('reservations.show');
+        Route::post('reservations/{reservation}/cancel', [CustomerReservationController::class, 'cancel'])->whereUuid('reservation')->name('reservations.cancel');
+        Route::get('reservations/{reservation}/payment-options', [CustomerReservationController::class, 'paymentOptions'])->whereUuid('reservation')->name('reservations.payment-options');
+        Route::post('reservations/{reservation}/payments', [CustomerReservationController::class, 'pay'])->middleware('throttle:payments')->whereUuid('reservation')->name('reservations.payments.store');
     });
 
     // --------------------------------------------------------------- Staff
@@ -78,5 +133,97 @@ Route::middleware('throttle:api')->group(function () {
 
         // Audit
         Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit.view')->name('audit-logs.index');
+
+        // Property & hotel policies
+        Route::get('property', [PropertyController::class, 'show'])->middleware('permission:settings.view|settings.update')->name('property.show');
+        Route::patch('property', [PropertyController::class, 'update'])->middleware('permission:settings.update')->name('property.update');
+
+        // Amenities
+        Route::get('amenities', [AmenityController::class, 'index'])->middleware('permission:rooms.view')->name('amenities.index');
+        Route::post('amenities', [AmenityController::class, 'store'])->middleware('permission:rooms.update')->name('amenities.store');
+        Route::patch('amenities/{amenity}', [AmenityController::class, 'update'])->middleware('permission:rooms.update')->whereNumber('amenity')->name('amenities.update');
+        Route::delete('amenities/{amenity}', [AmenityController::class, 'destroy'])->middleware('permission:rooms.update')->whereNumber('amenity')->name('amenities.destroy');
+
+        // Room types
+        Route::get('room-types', [RoomTypeController::class, 'index'])->middleware('permission:rooms.view')->name('room-types.index');
+        Route::post('room-types', [RoomTypeController::class, 'store'])->middleware('permission:rooms.create')->name('room-types.store');
+        Route::get('room-types/{roomType}', [RoomTypeController::class, 'show'])->middleware('permission:rooms.view')->whereNumber('roomType')->name('room-types.show');
+        Route::patch('room-types/{roomType}', [RoomTypeController::class, 'update'])->middleware('permission:rooms.update')->whereNumber('roomType')->name('room-types.update');
+        Route::delete('room-types/{roomType}', [RoomTypeController::class, 'destroy'])->middleware('permission:rooms.update')->whereNumber('roomType')->name('room-types.destroy');
+        Route::post('room-types/{roomType}/images', [RoomTypeController::class, 'storeImage'])->middleware('permission:rooms.update')->whereNumber('roomType')->name('room-types.images.store');
+        Route::put('room-types/{roomType}/images/order', [RoomTypeController::class, 'reorderImages'])->middleware('permission:rooms.update')->whereNumber('roomType')->name('room-types.images.order');
+        Route::delete('room-types/{roomType}/images/{image}', [RoomTypeController::class, 'destroyImage'])->middleware('permission:rooms.update')->whereNumber(['roomType', 'image'])->name('room-types.images.destroy');
+
+        // Rooms
+        Route::get('rooms', [RoomController::class, 'index'])->middleware('permission:rooms.view')->name('rooms.index');
+        Route::get('rooms/board', [RoomController::class, 'board'])->middleware('permission:rooms.view')->name('rooms.board');
+        Route::post('rooms', [RoomController::class, 'store'])->middleware('permission:rooms.create')->name('rooms.store');
+        Route::get('rooms/{room}', [RoomController::class, 'show'])->middleware('permission:rooms.view')->whereNumber('room')->name('rooms.show');
+        Route::patch('rooms/{room}', [RoomController::class, 'update'])->middleware('permission:rooms.update')->whereNumber('room')->name('rooms.update');
+        Route::delete('rooms/{room}', [RoomController::class, 'destroy'])->middleware('permission:rooms.update')->whereNumber('room')->name('rooms.destroy');
+        Route::patch('rooms/{room}/status', [RoomController::class, 'updateStatus'])->middleware('permission:rooms.manage_status')->whereNumber('room')->name('rooms.status');
+        Route::post('rooms/{room}/blocks', [RoomController::class, 'storeBlock'])->middleware('permission:rooms.manage_status')->whereNumber('room')->name('rooms.blocks.store');
+        Route::delete('rooms/{room}/blocks/{block}', [RoomController::class, 'destroyBlock'])->middleware('permission:rooms.manage_status')->whereNumber(['room', 'block'])->name('rooms.blocks.destroy');
+
+        // Guests
+        Route::get('guests', [GuestController::class, 'index'])->middleware('permission:guests.view')->name('guests.index');
+        Route::post('guests', [GuestController::class, 'store'])->middleware('permission:guests.create')->name('guests.store');
+        Route::get('guests/{guest}', [GuestController::class, 'show'])->middleware('permission:guests.view')->whereUuid('guest')->name('guests.show');
+        Route::patch('guests/{guest}', [GuestController::class, 'update'])->middleware('permission:guests.update')->whereUuid('guest')->name('guests.update');
+        Route::delete('guests/{guest}', [GuestController::class, 'destroy'])->middleware('permission:guests.update')->whereUuid('guest')->name('guests.destroy');
+        Route::get('guests/{guest}/reservations', [GuestController::class, 'reservations'])->middleware('permission:guests.view')->whereUuid('guest')->name('guests.reservations');
+        Route::get('guests/{guest}/documents', [GuestController::class, 'documents'])->middleware('permission:guests.documents.view')->whereUuid('guest')->name('guests.documents.index');
+        Route::post('guests/{guest}/documents', [GuestController::class, 'storeDocument'])->middleware('permission:guests.documents.view')->whereUuid('guest')->name('guests.documents.store');
+        Route::get('guests/{guest}/documents/{document}/download', [GuestController::class, 'downloadDocument'])->middleware('permission:guests.documents.view')->whereUuid(['guest', 'document'])->name('guests.documents.download');
+        Route::post('guests/{guest}/documents/{document}/verify', [GuestController::class, 'verifyDocument'])->middleware('permission:guests.documents.view')->whereUuid(['guest', 'document'])->name('guests.documents.verify');
+        Route::delete('guests/{guest}/documents/{document}', [GuestController::class, 'destroyDocument'])->middleware('permission:guests.documents.view')->whereUuid(['guest', 'document'])->name('guests.documents.destroy');
+
+        // Reservations
+        Route::get('reservations', [ReservationController::class, 'index'])->middleware('permission:reservations.view')->name('reservations.index');
+        Route::get('reservations/availability', [ReservationController::class, 'availability'])->middleware('permission:reservations.view|reservations.create')->name('reservations.availability');
+        Route::post('reservations', [ReservationController::class, 'store'])->middleware('permission:reservations.create')->name('reservations.store');
+        Route::get('reservations/{reservation}', [ReservationController::class, 'show'])->middleware('permission:reservations.view')->whereUuid('reservation')->name('reservations.show');
+        Route::patch('reservations/{reservation}', [ReservationController::class, 'update'])->middleware('permission:reservations.update')->whereUuid('reservation')->name('reservations.update');
+        Route::post('reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])->middleware('permission:reservations.cancel')->whereUuid('reservation')->name('reservations.cancel');
+
+        // Front desk
+        Route::get('front-desk/summary', [FrontDeskController::class, 'summary'])->middleware('permission:reservations.view')->name('front-desk.summary');
+
+        // Check-in / stays / check-out (M2c)
+        Route::get('stays', [StayController::class, 'index'])->middleware('permission:reservations.view')->name('stays.index');
+        Route::get('reservations/{reservation}/check-in', [StayController::class, 'checkInOptions'])->middleware('permission:checkins.create')->whereUuid('reservation')->name('reservations.check-in.options');
+        Route::post('reservations/{reservation}/check-in', [StayController::class, 'checkIn'])->middleware('permission:checkins.create')->whereUuid('reservation')->name('reservations.check-in');
+        Route::post('reservations/{reservation}/extend', [StayController::class, 'extend'])->middleware('permission:reservations.update')->whereUuid('reservation')->name('reservations.extend');
+        Route::post('stays/{stay}/move', [StayController::class, 'move'])->middleware('permission:checkins.create')->whereUuid('stay')->name('stays.move');
+        Route::get('reservations/{reservation}/check-out', [StayController::class, 'checkOutPreview'])->middleware('permission:checkouts.create')->whereUuid('reservation')->name('reservations.check-out.preview');
+        Route::post('reservations/{reservation}/check-out', [StayController::class, 'checkOut'])->middleware('permission:checkouts.create')->whereUuid('reservation')->name('reservations.check-out');
+        Route::get('folios/{number}', [FolioController::class, 'show'])->middleware('permission:reservations.view|payments.view')->where('number', 'FOL-\d{4}-\d{5,}')->name('folios.show');
+        Route::post('folios/{number}/email', [FolioController::class, 'email'])->middleware('permission:checkouts.create|payments.view')->where('number', 'FOL-\d{4}-\d{5,}')->name('folios.email');
+
+        // Guest bill items & services (spec §20-21)
+        Route::post('reservations/{reservation}/charges', [ChargeController::class, 'store'])->middleware('permission:services.charge|bills.update')->whereUuid('reservation')->name('reservations.charges.store');
+        Route::post('charges/{charge}/void', [ChargeController::class, 'void'])->middleware('permission:bills.update')->whereUuid('charge')->name('charges.void');
+        Route::get('services', [ServiceController::class, 'index'])->middleware('permission:services.view|services.charge|services.manage')->name('services.index');
+        Route::post('services', [ServiceController::class, 'store'])->middleware('permission:services.manage')->name('services.store');
+        Route::patch('services/{service}', [ServiceController::class, 'update'])->middleware('permission:services.manage')->whereNumber('service')->name('services.update');
+        Route::delete('services/{service}', [ServiceController::class, 'destroy'])->middleware('permission:services.manage')->whereNumber('service')->name('services.destroy');
+
+        // Payments & receipts
+        Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view')->name('payments.index');
+        Route::get('payments/summary', [PaymentController::class, 'summary'])->middleware('permission:payments.view')->name('payments.summary');
+        Route::get('payments/{payment}', [PaymentController::class, 'show'])->middleware('permission:payments.view')->whereUuid('payment')->name('payments.show');
+        Route::post('payments/{payment}/verify', [PaymentController::class, 'verify'])->middleware('permission:payments.view')->whereUuid('payment')->name('payments.verify');
+        Route::post('payments/{payment}/resolve', [PaymentController::class, 'resolve'])->middleware('permission:payments.refund')->whereUuid('payment')->name('payments.resolve');
+        Route::get('reservations/{reservation}/payments', [PaymentController::class, 'forReservation'])->middleware('permission:payments.view|reservations.view')->whereUuid('reservation')->name('reservations.payments.index');
+        Route::post('reservations/{reservation}/payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->whereUuid('reservation')->name('reservations.payments.store');
+        Route::get('receipts/{number}', [PaymentController::class, 'receipt'])->middleware('permission:payments.view|reservations.view')->where('number', 'RCP-\d{4}-\d{6,}')->name('receipts.show');
+        Route::post('receipts/{number}/email', [PaymentController::class, 'emailReceipt'])->middleware('permission:payments.view|payments.create')->where('number', 'RCP-\d{4}-\d{6,}')->name('receipts.email');
+
+        // Refunds (P14: above the threshold a second person must approve)
+        Route::get('refunds', [RefundController::class, 'index'])->middleware('permission:payments.view')->name('refunds.index');
+        Route::post('payments/{payment}/refunds', [RefundController::class, 'store'])->middleware('permission:payments.refund')->whereUuid('payment')->name('refunds.store');
+        Route::post('refunds/{refund}/approve', [RefundController::class, 'approve'])->middleware('permission:payments.refund')->whereUuid('refund')->name('refunds.approve');
+        Route::post('refunds/{refund}/reject', [RefundController::class, 'reject'])->middleware('permission:payments.refund')->whereUuid('refund')->name('refunds.reject');
+        Route::post('refunds/{refund}/complete', [RefundController::class, 'complete'])->middleware('permission:payments.refund')->whereUuid('refund')->name('refunds.complete');
     });
 });

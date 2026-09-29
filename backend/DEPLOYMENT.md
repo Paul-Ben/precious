@@ -41,7 +41,15 @@ php artisan migrate --force && php artisan db:seed --class=Database\\Seeders\\Co
 `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `FRONTEND_URL`,
 `DB_*` (from Railway), `REDIS_*`, `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`,
 `MAIL_MAILER=resend`, `RESEND_API_KEY`, `MAIL_FROM_ADDRESS`, `R2_*`,
+`MEDIA_DISK=r2_public`, `DOCUMENTS_DISK=r2_private`,
 `SUPER_ADMIN_EMAIL` (first deploy only), `LOG_CHANNEL=stderr`.
+
+The `scheduler` service is required from M2: it expires unpaid booking holds every minute and
+reconciles pending online payments every 10 minutes.
+
+Webhook URLs to register in the gateway dashboards (shown in Staff → Settings → Payment gateways):
+`https://<api-domain>/api/v1/webhooks/payments/paystack` and `…/flutterwave`. The gateway
+callback goes to `FRONTEND_URL/pay/callback`, so `FRONTEND_URL` must be the public site URL.
 
 Payment gateway keys are **not** environment variables — enter them in
 Staff → Settings → Payment gateways.

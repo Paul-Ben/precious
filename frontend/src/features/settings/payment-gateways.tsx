@@ -253,7 +253,10 @@ function GatewayCard({ gateway }: { gateway: PaymentGateway }) {
           <p className="font-medium">Webhook URL</p>
           <p className="text-muted">
             Add this URL in your {gateway.name} dashboard so payments are confirmed even if the customer closes the page.
-            (Payment processing is switched on in the Payments milestone.)
+            {gateway.gateway === "paystack"
+              ? " Paystack signs webhooks with your secret key - nothing else to set."
+              : " In Flutterwave, set the same “Secret hash” you entered above."}
+            {" "}Do not also turn on the gateway’s own “pass fees to customer” setting - the processing fee is already added here.
           </p>
           <div className="flex items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded-md bg-surface-muted px-3 py-2 font-mono text-xs">{gateway.webhook_url}</code>
@@ -270,6 +273,7 @@ function GatewayCard({ gateway }: { gateway: PaymentGateway }) {
               <Copy className="size-4" aria-hidden="true" /> {copied ? "Copied" : "Copy"}
             </Button>
           </div>
+          <FeeEditor key={JSON.stringify(gateway.fees)} gateway={gateway} />
           {gateway.last_test && (
             <p className="flex items-center gap-1.5 text-xs text-muted">
               {gateway.last_test.succeeded ? (
@@ -283,5 +287,60 @@ function GatewayCard({ gateway }: { gateway: PaymentGateway }) {
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * The gateway's transaction fee. Used to add the processing fee for the payer
+ * (Property & policies → "Payer covers gateway fees").
+ */
+function FeeEditor({ gateway }: { gateway: PaymentGateway }) {
+  const queryClient = useQueryClient();
+  const [fees, setFees] = useState({
+    percent: gateway.fees.percent,
+    flat: gateway.fees.flat ?? "",
+    flat_waived_below: gateway.fees.flat_waived_below ?? "",
+    cap: gateway.fees.cap ?? "",
+  });
+  const save = useMutation({
+    mutationFn: (reset: boolean) =>
+      api.patch(`settings/payment-gateways/${gateway.gateway}`, {
+        fees: reset
+          ? null
+          : {
+              percent: fees.percent.trim(),
+              flat: fees.flat.trim() || null,
+              flat_waived_below: fees.flat_waived_below.trim() || null,
+              cap: fees.cap.trim() || null,
+            },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: gatewaysKey }),
+  });
+  const err = isApiError(save.error) ? save.error : null;
+  const num = (v: string) => v.replace(/[^\d.]/g, "");
+  const d = gateway.fee_defaults;
+
+  return (
+    <div className="space-y-3 border-t border-border pt-4">
+      <div>
+        <p className="font-medium">Transaction fee</p>
+        <p className="text-xs text-muted">
+          Used to work out the processing fee added for the payer.
+          {d && ` Published Nigerian rate: ${d.percent}%${d.flat && Number(d.flat) > 0 ? ` + ₦${d.flat}` : ""}${d.flat_waived_below ? ` (flat fee waived under ₦${d.flat_waived_below})` : ""}${d.cap ? `, capped at ₦${d.cap}` : ""}.`}
+          {" "}Change only if you have a negotiated rate.
+        </p>
+      </div>
+      {save.isError && !err?.isValidation && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Field label="Percent (%)" error={err?.field("fees.percent")}><Input inputMode="decimal" value={fees.percent} onChange={(e) => setFees((f) => ({ ...f, percent: num(e.target.value) }))} /></Field>
+        <Field label="Flat fee (₦)" error={err?.field("fees.flat")}><Input inputMode="decimal" value={fees.flat} onChange={(e) => setFees((f) => ({ ...f, flat: num(e.target.value) }))} /></Field>
+        <Field label="No flat fee under (₦)" error={err?.field("fees.flat_waived_below")}><Input inputMode="decimal" value={fees.flat_waived_below} onChange={(e) => setFees((f) => ({ ...f, flat_waived_below: num(e.target.value) }))} /></Field>
+        <Field label="Cap (₦)" error={err?.field("fees.cap")}><Input inputMode="decimal" value={fees.cap} placeholder="No cap" onChange={(e) => setFees((f) => ({ ...f, cap: num(e.target.value) }))} /></Field>
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" size="sm" variant="outline" loading={save.isPending && save.variables === false} onClick={() => save.mutate(false)}>Save fee</Button>
+        <Button type="button" size="sm" variant="ghost" loading={save.isPending && save.variables === true} onClick={() => save.mutate(true)}>Reset to published rate</Button>
+      </div>
+    </div>
   );
 }

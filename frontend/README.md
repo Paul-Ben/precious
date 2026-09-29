@@ -4,7 +4,7 @@ Public website, customer portal and staff portal for the Hotel & Bar Unified Man
 Platform. All business logic lives in the Laravel API (`hotel-platform-backend`); this app
 presents it. This is the `frontend/` folder of the `precious` monorepo; the API is in `../backend`.
 
-**Status:** Milestone M1 (Foundation).
+**Status:** Milestone M2 complete — booking, online payment, front desk check-in/out, guest bills, payments and refunds.
 
 | | |
 |---|---|

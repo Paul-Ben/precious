@@ -37,7 +37,7 @@ final class RoleDefaults
                     'rooms.view', 'rooms.create', 'rooms.update', 'rooms.manage_status',
                     'guests.view', 'guests.create', 'guests.update', 'guests.documents.view',
                     'reservations.view', 'reservations.create', 'reservations.update', 'reservations.cancel',
-                    'checkins.create', 'checkouts.create',
+                    'checkins.create', 'checkouts.create', 'checkouts.override_balance',
                     'services.view', 'services.manage', 'services.charge',
                     'bar.tables.view', 'bar.tables.manage', 'bar.products.view', 'bar.products.manage',
                     'bar.orders.view', 'bar.orders.cancel', 'bar.orders.charge_to_room',

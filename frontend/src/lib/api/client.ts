@@ -17,6 +17,11 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** URL for a GET the browser should open directly (e.g. a file download). */
+export function bffUrl(path: string, query?: Query): string {
+  return buildUrl(path, query);
+}
+
 function buildUrl(path: string, query?: Query): string {
   const clean = path.replace(/^\/+/, "");
   const params = new URLSearchParams();
@@ -35,15 +40,17 @@ export async function request<T>(
   options: RequestOptions = {},
 ): Promise<ApiSuccess<T>> {
   let response: Response;
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
 
   try {
     response = await fetch(buildUrl(path, options.query), {
       method,
       headers: {
         Accept: "application/json",
-        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        // FormData sets its own multipart boundary.
+        ...(options.body !== undefined && !isForm ? { "Content-Type": "application/json" } : {}),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
       credentials: "same-origin",
       cache: "no-store",
       signal: options.signal,
@@ -74,6 +81,8 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, { body: body ?? {} }),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, { body: body ?? {} }),
   delete: <T>(path: string) => request<T>("DELETE", path),
+  /** multipart/form-data POST (file uploads). */
+  upload: <T>(path: string, form: FormData) => request<T>("POST", path, { body: form }),
 
   /** GET a paginated list and return items + pagination meta. */
   async list<T>(path: string, query?: Query, signal?: AbortSignal): Promise<Paginated<T>> {

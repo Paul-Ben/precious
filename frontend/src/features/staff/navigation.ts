@@ -1,12 +1,16 @@
 import {
   BedDouble,
+  Building2,
   CalendarCheck,
   ClipboardList,
+  ConciergeBell,
   CreditCard,
   LayoutDashboard,
   type LucideIcon,
   ScrollText,
   ShieldCheck,
+  Shirt,
+  UserRound,
   Users,
   Wine,
 } from "lucide-react";
@@ -29,15 +33,19 @@ export interface NavSection {
 export const staffNavigation: NavSection[] = [
   {
     title: "Overview",
-    items: [{ label: "Dashboard", href: "/staff/dashboard", icon: LayoutDashboard, permissions: [] }],
+    items: [
+      { label: "Dashboard", href: "/staff/dashboard", icon: LayoutDashboard, permissions: [] },
+      { label: "Front desk", href: "/staff/front-desk", icon: ConciergeBell, permissions: ["reservations.view", "rooms.view"] },
+    ],
   },
   {
     title: "Operations",
     items: [
-      { label: "Reservations", href: "/staff/reservations", icon: CalendarCheck, permissions: ["reservations.view"], soon: true },
-      { label: "Rooms", href: "/staff/rooms", icon: BedDouble, permissions: ["rooms.view"], soon: true },
+      { label: "Reservations", href: "/staff/reservations", icon: CalendarCheck, permissions: ["reservations.view"] },
+      { label: "Rooms", href: "/staff/rooms", icon: BedDouble, permissions: ["rooms.view"] },
+      { label: "Guests", href: "/staff/guests", icon: UserRound, permissions: ["guests.view"] },
       { label: "Bar", href: "/staff/bar", icon: Wine, permissions: ["bar.orders.view"], soon: true },
-      { label: "Payments", href: "/staff/payments", icon: CreditCard, permissions: ["payments.view"], soon: true },
+      { label: "Payments", href: "/staff/payments", icon: CreditCard, permissions: ["payments.view"] },
     ],
   },
   {
@@ -45,6 +53,8 @@ export const staffNavigation: NavSection[] = [
     items: [
       { label: "Users", href: "/staff/users", icon: Users, permissions: ["users.view"] },
       { label: "Roles & permissions", href: "/staff/roles", icon: ShieldCheck, permissions: ["roles.view"] },
+      { label: "Property & policies", href: "/staff/settings/property", icon: Building2, permissions: ["settings.view", "settings.update"] },
+      { label: "Hotel services", href: "/staff/settings/services", icon: Shirt, permissions: ["services.view", "services.manage"] },
       {
         label: "Payment gateways",
         href: "/staff/settings/payment-gateways",

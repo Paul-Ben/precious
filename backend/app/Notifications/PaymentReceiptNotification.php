@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Notifications;
+
+use App\Models\Receipt;
+use App\Support\Money;
+use Carbon\CarbonImmutable;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+
+class PaymentReceiptNotification extends Notification
+{
+    public function __construct(public readonly Receipt $receipt) {}
+
+    public function via(object $notifiable): array
+    {
+        return ['mail'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $s = $this->receipt->snapshot;
+        $money = fn (string $v) => Money::format(Money::toMinor($v));
+        $date = fn (string $d) => CarbonImmutable::parse($d)->format('D j M Y');
+
+        $mail = (new MailMessage)
+            ->subject("Payment received – {$s['for']['number']} ({$this->receipt->number})")
+            ->greeting('Thank you'.($s['received_from'] ? ', '.$s['received_from'] : '').'!')
+            ->line("We have received your payment of **{$money($s['amount'])}** for reservation **{$s['for']['number']}**.")
+            ->line("Stay: {$date($s['for']['check_in'])} → {$date($s['for']['check_out'])} ({$s['for']['nights']} night".($s['for']['nights'] === 1 ? '' : 's').').')
+            ->line('Receipt number: **'.$this->receipt->number.'**')
+            ->line('Payment method: '.$s['payment']['method_label'].($s['payment']['channel'] ? ' ('.str_replace('_', ' ', $s['payment']['channel']).')' : ''));
+
+        if (Money::toMinor($s['processing_fee']) > 0) {
+            $mail->line("Payment processing fee: {$money($s['processing_fee'])} · Total charged: {$money($s['total_charged'])}");
+        }
+
+        $balance = Money::toMinor($s['balance_after']);
+
+        return $mail
+            ->line($balance > 0
+                ? "Balance remaining: **{$money($s['balance_after'])}**, payable before or at check-out."
+                : 'Your reservation is fully paid.')
+            ->line('Please keep this email as your receipt. '.$s['hotel']['name'].($s['hotel']['phone'] ? ' · '.$s['hotel']['phone'] : ''));
+    }
+}

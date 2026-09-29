@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Reference data required by every environment (including tests):
- * permissions, system roles and payment gateway rows.
+ * permissions, system roles, payment gateway rows and the hotel property.
  */
 class CoreSeeder extends Seeder
 {
@@ -16,6 +16,7 @@ class CoreSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             PaymentGatewaySeeder::class,
+            PropertySeeder::class,
         ]);
     }
 }
