@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Minus, Plus, Search, Send, Trash2, UserRound } from "lucide-react";
+import { BellRing, Check, Minus, Plus, Search, Send, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +13,13 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 import { RequirePermission } from "@/features/staff/require-permission";
+import { useSession } from "@/features/staff/session-context";
 import { errorMessage, isApiError } from "@/lib/api/errors";
-import type { BarProduct, BarTable } from "@/lib/api/types";
+import type { BarOrder, BarProduct, BarTable } from "@/lib/api/types";
 import { formatNaira } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { barApi, barKeys } from "./api";
+import { pollEvery, useBarRealtime } from "./use-bar-realtime";
 import { TabBill } from "./tab-bill";
 
 const TABLE_TONE: Record<string, string> = {
@@ -39,10 +41,21 @@ export function PosPage() {
 function Pos() {
   const [tabId, setTabId] = useState<string | null>(null);
   const [opening, setOpening] = useState<BarTable | "walk-up" | null>(null);
-  const tables = useQuery({ queryKey: barKeys.tables, queryFn: () => barApi.tables(), refetchInterval: 10_000 });
+  const { connected } = useBarRealtime();
+  const tables = useQuery({ queryKey: barKeys.tables, queryFn: () => barApi.tables(), refetchInterval: pollEvery(connected, 10_000) });
+  // Orders the bar has made and bills that have no table: both need a way back in from this screen.
+  const queue = useQuery({ queryKey: barKeys.queue, queryFn: barApi.queue, refetchInterval: pollEvery(connected, 10_000) });
+  const openTabs = useQuery({
+    queryKey: barKeys.tabs({ status: "OPEN" }),
+    queryFn: () => barApi.tabs({ status: "OPEN", per_page: 100 }),
+    refetchInterval: pollEvery(connected, 10_000),
+  });
+  const ready = (queue.data ?? []).filter((o) => o.status === "READY");
+  const readyTabIds = new Set(ready.map((o) => o.tab?.id));
+  const walkUps = (openTabs.data?.items ?? []).filter((t) => !t.table);
 
   if (tabId) {
-    return <TabWorkspace tabId={tabId} onBack={() => setTabId(null)} />;
+    return <TabWorkspace tabId={tabId} live={connected} onBack={() => setTabId(null)} />;
   }
 
   return (
@@ -52,6 +65,30 @@ function Pos() {
         description="Tap a table to open a bill or continue one."
         actions={<Button variant="outline" onClick={() => setOpening("walk-up")}>Bill without a table</Button>}
       />
+      {ready.length > 0 && <ReadyToCollect orders={ready} onOpen={setTabId} />}
+      {walkUps.length > 0 && (
+        <section aria-labelledby="walk-ups" className="mb-6">
+          <h2 id="walk-ups" className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Bills without a table</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {walkUps.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTabId(t.id)}
+                className="relative flex min-h-24 flex-col rounded-2xl border-2 border-accent/60 bg-accent/15 p-3 text-left hover:bg-accent/25"
+              >
+                {readyTabIds.has(t.id) && <ReadyBadge />}
+                <span className="block text-lg font-bold">{t.customer_name || "Walk-in"}</span>
+                <span className="block text-xs text-muted">{t.number}{t.waiter ? ` · ${t.waiter.name}` : ""}</span>
+                <span className="mt-auto pt-2 text-sm font-medium">{formatNaira(t.total)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {(ready.length > 0 || walkUps.length > 0) && (
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Tables</h2>
+      )}
       {tables.isPending ? (
         <LoadingState />
       ) : tables.isError ? (
@@ -61,7 +98,8 @@ function Pos() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {tables.data.map((t) => (
-            <div key={t.id} className={cn("flex min-h-32 flex-col rounded-2xl border-2 p-3", TABLE_TONE[t.status])}>
+            <div key={t.id} className={cn("relative flex min-h-32 flex-col rounded-2xl border-2 p-3", TABLE_TONE[t.status])}>
+              {(t.open_tabs ?? []).some((tab) => readyTabIds.has(tab.id)) && <ReadyBadge />}
               <button
                 type="button"
                 className="flex-1 text-left"
@@ -97,6 +135,64 @@ function Pos() {
   );
 }
 
+function ReadyBadge() {
+  return (
+    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-xs font-semibold text-white">
+      <BellRing className="size-3" aria-hidden /> Ready
+    </span>
+  );
+}
+
+/** Orders the bartender has marked ready: collect from the bar, then tap Delivered. */
+function ReadyToCollect({ orders, onOpen }: { orders: BarOrder[]; onOpen: (tabId: string) => void }) {
+  const { user } = useSession();
+  const queryClient = useQueryClient();
+  const deliver = useMutation({
+    mutationFn: (o: BarOrder) => barApi.advance(o.id, "DELIVERED"),
+    onSuccess: async (_res, o) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: barKeys.queue }),
+        queryClient.invalidateQueries({ queryKey: barKeys.tables }),
+        queryClient.invalidateQueries({ queryKey: ["bar", "tabs"] }),
+        o.tab ? queryClient.invalidateQueries({ queryKey: barKeys.tab(o.tab.id) }) : Promise.resolve(),
+      ]);
+    },
+  });
+  // Your own orders first.
+  const sorted = [...orders].sort((a, b) => Number(b.waiter?.id === user.id) - Number(a.waiter?.id === user.id));
+
+  return (
+    <section aria-labelledby="ready" className="mb-6 rounded-2xl border-2 border-success/40 bg-success-soft p-4">
+      <h2 id="ready" className="mb-3 flex items-center gap-2 font-semibold text-success">
+        <BellRing className="size-4" aria-hidden /> Ready to collect ({orders.length})
+      </h2>
+      {deliver.isError && <Alert tone="danger" className="mb-3">{errorMessage(deliver.error)}</Alert>}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {sorted.map((o) => (
+          <div key={o.id} className={cn("rounded-xl border border-border bg-surface p-3", o.waiter?.id === user.id && "ring-2 ring-success/50")}>
+            <p className="font-semibold">
+              {o.tab?.table ?? "No table"}
+              {o.tab?.customer_name && <span className="font-normal text-muted"> · {o.tab.customer_name}</span>}
+            </p>
+            <p className="text-xs text-muted">{o.number}{o.waiter ? ` · ${o.waiter.id === user.id ? "your order" : o.waiter.name}` : ""}</p>
+            <ul className="mt-2 text-sm">
+              {(o.items ?? []).map((i) => (
+                <li key={i.id}><span className="font-semibold">{i.quantity}×</span> {i.name}</li>
+              ))}
+            </ul>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" loading={deliver.isPending && deliver.variables?.id === o.id} onClick={() => deliver.mutate(o)}>
+                <Check className="size-4" aria-hidden /> Delivered
+              </Button>
+              {o.tab && <Button size="sm" variant="outline" onClick={() => onOpen(o.tab!.id)}>Open bill</Button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function OpenTabDialog({ table, onClose, onOpened }: { table: BarTable | null; onClose: () => void; onOpened: (id: string) => void }) {
   const queryClient = useQueryClient();
   const [f, setF] = useState({ customer_name: "", customer_phone: "", customer_email: "" });
@@ -109,7 +205,7 @@ function OpenTabDialog({ table, onClose, onOpened }: { table: BarTable | null; o
         customer_email: f.customer_email.trim() || undefined,
       }),
     onSuccess: async (res) => {
-      await queryClient.invalidateQueries({ queryKey: barKeys.tables });
+      await queryClient.invalidateQueries({ queryKey: ["bar"] });
       onOpened(res.data.id);
     },
   });
@@ -144,10 +240,10 @@ interface CartLine {
   notes: string;
 }
 
-function TabWorkspace({ tabId, onBack }: { tabId: string; onBack: () => void }) {
+function TabWorkspace({ tabId, live, onBack }: { tabId: string; live: boolean; onBack: () => void }) {
   const queryClient = useQueryClient();
   const menu = useQuery({ queryKey: barKeys.menu, queryFn: barApi.menu, refetchInterval: 30_000 });
-  const tab = useQuery({ queryKey: barKeys.tab(tabId), queryFn: () => barApi.tab(tabId), refetchInterval: 5_000 });
+  const tab = useQuery({ queryKey: barKeys.tab(tabId), queryFn: () => barApi.tab(tabId), refetchInterval: pollEvery(live, 5_000) });
   const [category, setCategory] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -176,7 +272,7 @@ function TabWorkspace({ tabId, onBack }: { tabId: string; onBack: () => void }) 
       setCart([]);
       setNote("");
       await queryClient.invalidateQueries({ queryKey: barKeys.tab(tabId) });
-      await queryClient.invalidateQueries({ queryKey: barKeys.tables });
+      await queryClient.invalidateQueries({ queryKey: ["bar"] });
     },
   });
 

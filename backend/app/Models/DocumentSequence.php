@@ -16,7 +16,13 @@ class DocumentSequence extends Model
      */
     public static function next(string $prefix, int $year, int $pad = 5): string
     {
-        return DB::transaction(function () use ($prefix, $year, $pad) {
+        return sprintf('%s-%d-%s', $prefix, $year, str_pad((string) static::nextValue($prefix, $year), $pad, '0', STR_PAD_LEFT));
+    }
+
+    /** Next raw counter value for (prefix, year); year 0 = a sequence that never resets. */
+    public static function nextValue(string $prefix, int $year = 0): int
+    {
+        return DB::transaction(function () use ($prefix, $year) {
             static::query()->insertOrIgnore([
                 'prefix' => $prefix,
                 'year' => $year,
@@ -33,7 +39,7 @@ class DocumentSequence extends Model
 
             $row->increment('last_value');
 
-            return sprintf('%s-%d-%s', $prefix, $year, str_pad((string) $row->last_value, $pad, '0', STR_PAD_LEFT));
+            return (int) $row->last_value;
         });
     }
 }

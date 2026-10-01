@@ -94,7 +94,13 @@ class ReservationResource extends JsonResource
                 ->values()),
             'charges' => $this->whenLoaded('charges', fn () => $this->charges
                 ->filter(fn (ReservationCharge $c) => $this->staffView || $c->isActive())
-                ->map(fn (ReservationCharge $c) => (new ChargeResource($c))->resolve($request))
+                // Guests see what they are charged, not which staff member posted it or internal reasons.
+                ->map(fn (ReservationCharge $c) => $this->staffView
+                    ? (new ChargeResource($c))->resolve($request)
+                    : array_intersect_key((new ChargeResource($c))->resolve($request), array_flip([
+                        'id', 'category', 'category_label', 'description', 'quantity', 'unit_price',
+                        'subtotal', 'service_charge', 'vat', 'total', 'status', 'created_at',
+                    ])))
                 ->values()),
             'stays' => $this->when($this->staffView && $this->relationLoaded('stays'), fn () => StayResource::collection($this->stays)->resolve($request)),
             'folio_number' => $this->whenLoaded('folioStatement', fn () => $this->folioStatement?->number),

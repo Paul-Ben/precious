@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Amenity;
 use App\Models\Department;
+use App\Models\ExpenseCategory;
 use App\Models\Property;
+use App\Models\ShiftTemplate;
 use Illuminate\Database\Seeder;
 
 /**
@@ -41,6 +43,18 @@ class PropertySeeder extends Seeder
                 ['property_id' => $property->id, 'code' => $code],
                 ['name' => $name]
             );
+        }
+
+        // P24 – standard shifts; managers can add others or enter custom times.
+        foreach ([['Morning', '07:00', '15:00'], ['Afternoon', '15:00', '23:00'], ['Night', '23:00', '07:00']] as [$name, $start, $end]) {
+            ShiftTemplate::query()->firstOrCreate(
+                ['property_id' => $property->id, 'name' => $name],
+                ['start_time' => $start, 'end_time' => $end]
+            );
+        }
+
+        foreach (config('hotel.expense_categories') as $name) {
+            ExpenseCategory::query()->firstOrCreate(['property_id' => $property->id, 'name' => $name]);
         }
 
         $amenities = [

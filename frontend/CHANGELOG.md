@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.8.0] — 2026-10-05 — M6 Finance
+
+### Added
+- Finance → Finance overview: revenue, expenses, net position, outstanding, by-day table with
+  closing status, downloads (CSV / Excel), print.
+- Finance → Expenses: record (with receipt), filters, approve / reject, edit while pending,
+  void with reason, categories.
+- Finance → Daily closing: figures by method, cash drawer, count and close, reopen (admins),
+  printable sheet with signature lines.
+- Finance → Outstanding bills.
+
+## [0.7.0] — 2026-10-04 — M5 Staff & shifts
+
+### Added
+- People → Staff: directory with search and filters; staff record page (department, position,
+  status, dates, emergency contact, notes, photo).
+- People → Rota: weekly grid by person, add / edit / cancel shifts, standard shifts editor,
+  copy last week, department filter, print.
+- People → Attendance: needs-attention list with record/correct (reason required), hours by
+  person, CSV.
+- My shifts (every staff member): upcoming shifts, Clock in / Clock out, who you're working with.
+
+## [0.6.0] — 2026-10-03 — M4 Realtime & reports
+
+### Added
+- Live bar queue, bills and table map over Laravel Reverb (`laravel-echo` + `pusher-js`,
+  auth through the BFF); slow polling while live, fast polling as fallback.
+- Staff → Reports: date presets and custom range, KPI tiles (occupancy, room revenue,
+  ADR/RevPAR, bar sales, money received), revenue-by-day chart with table view, bar and
+  payment breakdowns, top products, bills by waiter, CSV downloads (with `reports.export`).
+
+### Changed
+- Pay-link, payment result and booking confirmation pages send no referrer (tokens in URLs).
+
 ## [0.5.0] — 2026-10-02 — M3 Bar / POS
 
 ### Added

@@ -42,6 +42,20 @@ return [
         'require_id_at_check_in' => true,
         // P14 – refunds above this amount need a second approver.
         'refund_second_approval_above' => '100000.00',
+        // P25 – staff may clock in this many minutes before a shift starts…
+        'shift_clock_in_early_minutes' => 30,
+        // …and are LATE when they clock in more than this many minutes after it starts.
+        'shift_late_grace_minutes' => 10,
+        // P26 – a forgotten clock-out is closed (at the shift end) this many hours after the shift.
+        'shift_auto_close_after_hours' => 4,
+        // P30 – expenses above this amount wait for a manager's approval.
+        'expense_approval_above' => '50000.00',
+    ],
+
+    // P29 – standard expense categories (managers can add more).
+    'expense_categories' => [
+        'Bar stock', 'Kitchen & food', 'Housekeeping & laundry', 'Utilities (power, diesel, water)',
+        'Repairs & maintenance', 'Salaries & wages', 'Marketing', 'Bank & gateway charges', 'Taxes & levies', 'Other',
     ],
 
     // Where room photos (public) and guest ID documents (private) are stored.

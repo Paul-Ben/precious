@@ -14,6 +14,7 @@ import { errorMessage } from "@/lib/api/errors";
 import type { BarOrder, BarOrderStatus } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { barApi, barKeys, minutesSince } from "./api";
+import { pollEvery, useBarRealtime } from "./use-bar-realtime";
 
 const COLUMNS: { status: BarOrderStatus; title: string; next?: BarOrderStatus; action?: string }[] = [
   { status: "PLACED", title: "New", next: "ACCEPTED", action: "Accept" },
@@ -22,7 +23,7 @@ const COLUMNS: { status: BarOrderStatus; title: string; next?: BarOrderStatus; a
   { status: "READY", title: "Ready for pickup" },
 ];
 
-/** Bartender live queue (spec §25). Refreshes every few seconds. */
+/** Bartender live queue (spec §25). Live over Reverb; polls as a fallback. */
 export function QueuePage() {
   return (
     <RequirePermission permission={["bar.orders.prepare", "bar.orders.view"]}>
@@ -34,7 +35,8 @@ export function QueuePage() {
 function Queue() {
   const { can } = useSession();
   const queryClient = useQueryClient();
-  const queue = useQuery({ queryKey: barKeys.queue, queryFn: barApi.queue, refetchInterval: 4_000 });
+  const { connected } = useBarRealtime();
+  const queue = useQuery({ queryKey: barKeys.queue, queryFn: barApi.queue, refetchInterval: pollEvery(connected, 4_000) });
   const [now, setNow] = useState(() => Date.now());
   const [showStock, setShowStock] = useState(false);
 
@@ -54,7 +56,7 @@ function Queue() {
     <>
       <PageHeader
         title="Bar queue"
-        description="Oldest first. Updates automatically."
+        description={connected ? "Oldest first. Live." : "Oldest first. Refreshes every few seconds."}
         actions={can("bar.orders.prepare") && <Button variant="outline" onClick={() => setShowStock((s) => !s)}>{showStock ? "Hide" : "Sold out items"}</Button>}
       />
       {showStock && <StockPanel />}

@@ -253,3 +253,56 @@ All staff routes are under `/bar`.
 
 Error codes: `TAB_CLOSED`, `TABLE_BLOCKED`, `TABLE_IN_USE`, `PRODUCT_UNAVAILABLE`, `ORDERS_PENDING`,
 `BALANCE_DUE`, `PARTLY_PAID`, `NOTHING_DUE`, `ROOM_GUEST_MISMATCH`, `REASON_REQUIRED`, `CATEGORY_IN_USE`, `BAR_CHARGE`.
+
+## Endpoints (M4 — reports, realtime)
+
+| Method | Path | Permission / notes |
+|---|---|---|
+| GET | `/reports/summary?from&to` | `reports.view` — dates `Y-m-d` in hotel time, default last 7 days, max one year. Returns `hotel` (rooms, room_nights, occupancy_percent, room_revenue, adr, revpar, extras), `bar` (bills, sales, discounts, service_charge, vat, total, charged_to_room, average_bill, top_products, by_waiter), `payments` (received, refunded, net, by_method, hotel, bar) and `daily[]` |
+| GET | `/reports/export?type=payments\|bar-sales\|reservations&from&to` | `reports.export` — `text/csv` download (UTF-8 with BOM, opens in Excel) |
+| POST | `/broadcasting/auth` | signed-in, active, 2FA-confirmed staff — Reverb private-channel auth (`{socket_id, channel_name}`) |
+
+Channel `private-bar`, event `.order.changed` → `{id, number, status, tab_id, property_id}`.
+
+## Endpoints (M5 — staff & shifts)
+
+| Method | Path | Permission / notes |
+|---|---|---|
+| GET | `/departments` | `staff.view` / `staff.schedule` / `staff.update` |
+| GET | `/staff?search&department_id&employment_status&per_page` · `?all=1` | `staff.view` or `staff.schedule` — `all=1`: everyone schedulable, unpaginated |
+| GET / PATCH | `/staff/{user}` | `staff.view` / `staff.update` — `{department_id, position, employment_status, start_date, end_date, address, emergency_contact_name, emergency_contact_phone, notes}` |
+| GET / POST / DELETE | `/staff/{user}/photo` | view: `staff.view`/`staff.schedule`; change: `staff.update` (multipart `photo`, ≤4 MB) |
+| GET · POST · PATCH · DELETE | `/shift-templates[/{id}]` | read: `staff.view`/`staff.schedule`; change: `staff.schedule` — `{name, start_time "HH:MM", end_time, is_active}` |
+| GET | `/shifts?from&to&user_id&department_id&include_cancelled` | `staff.view` or `staff.schedule` (≤ 2 months) |
+| POST | `/shifts` | `staff.schedule` — `{user_id, date, template_id \| start_time+end_time, department_id?, location?, notes?}` |
+| PATCH | `/shifts/{uuid}` | `staff.schedule` — any of the above; time changes rejected once started (`SHIFT_STARTED`) |
+| POST | `/shifts/{uuid}/cancel` | `staff.schedule` — `{reason?}` |
+| POST | `/shifts/copy-week` | `staff.schedule` — `{from_week, to_week}` (Mondays) → `{created, skipped[]}` |
+| PUT | `/shifts/{uuid}/attendance` | `staff.schedule` — `{absent?, clock_in_at?, clock_out_at? ("Y-m-d H:i" hotel time), reason}` |
+| GET | `/attendance?from&to&user_id&exceptions` · `/attendance/summary` · `/attendance/export` (CSV) | `staff.view` or `staff.schedule` |
+| GET | `/my-shifts?from&to` | any staff — own shifts with `can_clock_in`, `can_clock_out`, `colleagues` |
+| POST | `/my-shifts/{uuid}/clock-in` · `/clock-out` | the person on the shift |
+
+Error codes: `SHIFT_OVERLAP`, `SHIFT_STARTED`, `SHIFT_CANCELLED`, `SHIFT_NOT_STARTED`, `SHIFT_ENDED`, `SHIFT_TOO_LONG`,
+`STAFF_INACTIVE`, `NOT_STAFF`, `TIMES_REQUIRED`, `INVALID_TIMES`, `CLOCK_IN_TOO_EARLY`, `ALREADY_CLOCKED_IN`,
+`NOT_CLOCKED_IN`, `CLOCK_IN_REQUIRED`.
+
+## Endpoints (M6 — finance)
+
+| Method | Path | Permission / notes |
+|---|---|---|
+| GET | `/finance/summary?from&to` | `finance.view` / `finance.reports` — revenue (received, refunded, net, hotel, bar, by_method, billed), expenses (total, by_category, pending), net_position, outstanding totals, days[] |
+| GET | `/finance/outstanding` | `finance.view` / `finance.reports` — reservations[], bar_tabs[], total |
+| GET | `/finance/day?date` · `/finance/closings?month=YYYY-MM` | `finance.view` / `finance.close_day` |
+| POST | `/finance/day/close` | `finance.close_day` — `{date, cash_counted, note?}` (note required when counted ≠ expected) |
+| POST | `/finance/day/reopen` | `finance.reopen_day` — `{date, reason}` |
+| GET | `/finance/export?type=summary\|expenses\|refunds\|outstanding&format=csv\|xlsx&from&to` | `finance.reports` |
+| GET · POST · PATCH | `/finance/expense-categories[/{id}]` | read: `finance.view`/`finance.expenses`/`finance.expenses.approve`; change: `finance.expenses.approve` |
+| GET | `/finance/expenses?from&to&status&category_id&method&search` | `finance.view` / `finance.expenses` / `finance.expenses.approve` — meta: approved_total, pending_count, approval_limit |
+| POST | `/finance/expenses` | `finance.expenses` — JSON or multipart with `receipt` (jpg/png/webp/pdf ≤ 8 MB) |
+| GET / PATCH | `/finance/expenses/{uuid}` | PATCH only while PENDING (`EXPENSE_LOCKED`) |
+| POST | `/finance/expenses/{uuid}/approve` · `/reject {reason}` | `finance.expenses.approve` — not your own (`SELF_APPROVAL`) |
+| POST | `/finance/expenses/{uuid}/void {reason}` | `finance.expenses` |
+| GET / POST | `/finance/expenses/{uuid}/receipt` | view / `finance.expenses` |
+
+Error codes: `DAY_CLOSED`, `DAY_ALREADY_CLOSED`, `DAY_NOT_STARTED`, `DAY_NOT_CLOSED`, `NOTE_REQUIRED`, `EXPENSE_LOCKED`, `SELF_APPROVAL`, `INVALID_STATUS`.

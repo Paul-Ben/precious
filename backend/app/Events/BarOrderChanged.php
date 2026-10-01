@@ -9,8 +9,8 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
- * Pushed to the bartender queue and waiter screens (spec §25, Reverb in M4).
- * With BROADCAST_CONNECTION=log it is only logged; the screens also poll.
+ * Pushed to the bartender queue and waiter screens over Reverb (spec §25).
+ * The screens also poll, so a missing Reverb server only slows updates.
  */
 class BarOrderChanged implements ShouldBroadcastNow
 {
@@ -20,7 +20,7 @@ class BarOrderChanged implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('bar.'.$this->propertyId)];
+        return [new PrivateChannel('bar')];
     }
 
     public function broadcastAs(): string
@@ -36,6 +36,7 @@ class BarOrderChanged implements ShouldBroadcastNow
             'number' => $this->order->number,
             'status' => $this->order->status->value,
             'tab_id' => $this->order->tab_id,
+            'property_id' => $this->propertyId,
         ];
     }
 }

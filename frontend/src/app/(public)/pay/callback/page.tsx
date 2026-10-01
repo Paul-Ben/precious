@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LoadingState } from "@/components/ui/states";
 import { PaymentCallback } from "@/features/payments/payment-callback";
 
-export const metadata: Metadata = { title: "Payment", robots: { index: false } };
+export const metadata: Metadata = { title: "Payment", robots: { index: false }, referrer: "no-referrer" };
 
 export default function Page() {
   return (

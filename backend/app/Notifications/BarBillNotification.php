@@ -5,12 +5,19 @@ namespace App\Notifications;
 use App\Enums\BarOrderStatus;
 use App\Models\BarTab;
 use App\Support\Money;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Spec §26: the customer's bill with items, totals and a secure pay link. */
-class BarBillNotification extends Notification
+/**
+ * Spec §26: the customer's bill with items, totals and a secure pay link.
+ * Queued: sent by the queue worker so a slow mail provider never delays the desk.
+ */
+class BarBillNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     public function __construct(public readonly BarTab $tab, public readonly bool $final) {}
 
     public function via(object $notifiable): array

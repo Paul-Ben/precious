@@ -79,7 +79,8 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('public', fn (Request $request) => Limit::perMinute(120)->by('public:'.$request->ip()));
         RateLimiter::for('booking', fn (Request $request) => Limit::perMinute(10)->by('booking:'.$request->ip()));
         RateLimiter::for('booking-lookup', fn (Request $request) => Limit::perMinute(20)->by('lookup:'.$request->ip()));
-        RateLimiter::for('payments', fn (Request $request) => Limit::perMinute(10)->by('pay:'.$request->ip()));
+        // The /pay/callback page re-checks a pending payment up to 6 times; allow for retries.
+        RateLimiter::for('payments', fn (Request $request) => Limit::perMinute(30)->by('pay:'.$request->ip()));
         // Gateways retry on failure; generous but bounded.
         RateLimiter::for('webhooks', fn (Request $request) => Limit::perMinute(300)->by('webhook:'.$request->ip()));
 

@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\Bar\OrderController as BarOrderController;
 use App\Http\Controllers\Api\V1\Bar\TabController as BarTabController;
 use App\Http\Controllers\Api\V1\Bar\TableController as BarTableController;
 use App\Http\Controllers\Api\V1\Customer\ReservationController as CustomerReservationController;
+use App\Http\Controllers\Api\V1\Finance\ExpenseController;
+use App\Http\Controllers\Api\V1\Finance\FinanceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\Hotel\AmenityController;
 use App\Http\Controllers\Api\V1\Hotel\ChargeController;
@@ -27,7 +29,13 @@ use App\Http\Controllers\Api\V1\Public\BarTabController as PublicBarTabControlle
 use App\Http\Controllers\Api\V1\Public\CatalogController;
 use App\Http\Controllers\Api\V1\Public\PaymentController as PublicPaymentController;
 use App\Http\Controllers\Api\V1\Public\ReservationController as PublicReservationController;
+use App\Http\Controllers\Api\V1\Reports\ReportController;
 use App\Http\Controllers\Api\V1\RoleController;
+use App\Http\Controllers\Api\V1\Staff\AttendanceController;
+use App\Http\Controllers\Api\V1\Staff\MyShiftController;
+use App\Http\Controllers\Api\V1\Staff\ShiftController;
+use App\Http\Controllers\Api\V1\Staff\ShiftTemplateController;
+use App\Http\Controllers\Api\V1\Staff\StaffController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -251,6 +259,65 @@ Route::middleware('throttle:api')->group(function () {
             Route::post('orders/{order}/status', [BarOrderController::class, 'advance'])->middleware('permission:bar.orders.prepare|bar.orders.deliver')->whereUuid('order')->name('orders.status');
             Route::post('orders/{order}/cancel', [BarOrderController::class, 'cancel'])->middleware('permission:bar.orders.create|bar.orders.cancel')->whereUuid('order')->name('orders.cancel');
         });
+
+        // Finance (M6)
+        Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('summary', [FinanceController::class, 'summary'])->middleware('permission:finance.view|finance.reports')->name('summary');
+            Route::get('outstanding', [FinanceController::class, 'outstanding'])->middleware('permission:finance.view|finance.reports')->name('outstanding');
+            Route::get('day', [FinanceController::class, 'day'])->middleware('permission:finance.view|finance.close_day')->name('day');
+            Route::get('closings', [FinanceController::class, 'closings'])->middleware('permission:finance.view|finance.close_day')->name('closings');
+            Route::post('day/close', [FinanceController::class, 'close'])->middleware('permission:finance.close_day')->name('day.close');
+            Route::post('day/reopen', [FinanceController::class, 'reopen'])->middleware('permission:finance.reopen_day')->name('day.reopen');
+            Route::get('export', [FinanceController::class, 'export'])->middleware('permission:finance.reports')->name('export');
+
+            Route::get('expense-categories', [ExpenseController::class, 'categories'])->middleware('permission:finance.view|finance.expenses|finance.expenses.approve')->name('expense-categories.index');
+            Route::post('expense-categories', [ExpenseController::class, 'storeCategory'])->middleware('permission:finance.expenses.approve')->name('expense-categories.store');
+            Route::patch('expense-categories/{category}', [ExpenseController::class, 'updateCategory'])->middleware('permission:finance.expenses.approve')->whereNumber('category')->name('expense-categories.update');
+
+            Route::get('expenses', [ExpenseController::class, 'index'])->middleware('permission:finance.view|finance.expenses|finance.expenses.approve')->name('expenses.index');
+            Route::post('expenses', [ExpenseController::class, 'store'])->middleware('permission:finance.expenses')->name('expenses.store');
+            Route::get('expenses/{expense}', [ExpenseController::class, 'show'])->middleware('permission:finance.view|finance.expenses|finance.expenses.approve')->whereUuid('expense')->name('expenses.show');
+            Route::patch('expenses/{expense}', [ExpenseController::class, 'update'])->middleware('permission:finance.expenses')->whereUuid('expense')->name('expenses.update');
+            Route::post('expenses/{expense}/approve', [ExpenseController::class, 'approve'])->middleware('permission:finance.expenses.approve')->whereUuid('expense')->name('expenses.approve');
+            Route::post('expenses/{expense}/reject', [ExpenseController::class, 'reject'])->middleware('permission:finance.expenses.approve')->whereUuid('expense')->name('expenses.reject');
+            Route::post('expenses/{expense}/void', [ExpenseController::class, 'void'])->middleware('permission:finance.expenses')->whereUuid('expense')->name('expenses.void');
+            Route::get('expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->middleware('permission:finance.view|finance.expenses|finance.expenses.approve')->whereUuid('expense')->name('expenses.receipt');
+            Route::post('expenses/{expense}/receipt', [ExpenseController::class, 'storeReceipt'])->middleware('permission:finance.expenses')->whereUuid('expense')->name('expenses.receipt.store');
+        });
+
+        // Staff & shifts (M5)
+        Route::get('departments', [StaffController::class, 'departments'])->middleware('permission:staff.view|staff.schedule|staff.update')->name('departments.index');
+        Route::get('staff', [StaffController::class, 'index'])->middleware('permission:staff.view|staff.schedule')->name('staff.index');
+        Route::get('staff/{user}', [StaffController::class, 'show'])->middleware('permission:staff.view')->whereUuid('user')->name('staff.show');
+        Route::patch('staff/{user}', [StaffController::class, 'update'])->middleware('permission:staff.update')->whereUuid('user')->name('staff.update');
+        Route::get('staff/{user}/photo', [StaffController::class, 'photo'])->middleware('permission:staff.view|staff.schedule')->whereUuid('user')->name('staff.photo');
+        Route::post('staff/{user}/photo', [StaffController::class, 'storePhoto'])->middleware('permission:staff.update')->whereUuid('user')->name('staff.photo.store');
+        Route::delete('staff/{user}/photo', [StaffController::class, 'destroyPhoto'])->middleware('permission:staff.update')->whereUuid('user')->name('staff.photo.destroy');
+
+        Route::get('shift-templates', [ShiftTemplateController::class, 'index'])->middleware('permission:staff.view|staff.schedule')->name('shift-templates.index');
+        Route::post('shift-templates', [ShiftTemplateController::class, 'store'])->middleware('permission:staff.schedule')->name('shift-templates.store');
+        Route::patch('shift-templates/{shiftTemplate}', [ShiftTemplateController::class, 'update'])->middleware('permission:staff.schedule')->whereNumber('shiftTemplate')->name('shift-templates.update');
+        Route::delete('shift-templates/{shiftTemplate}', [ShiftTemplateController::class, 'destroy'])->middleware('permission:staff.schedule')->whereNumber('shiftTemplate')->name('shift-templates.destroy');
+
+        Route::get('shifts', [ShiftController::class, 'index'])->middleware('permission:staff.view|staff.schedule')->name('shifts.index');
+        Route::post('shifts', [ShiftController::class, 'store'])->middleware('permission:staff.schedule')->name('shifts.store');
+        Route::post('shifts/copy-week', [ShiftController::class, 'copyWeek'])->middleware('permission:staff.schedule')->name('shifts.copy-week');
+        Route::patch('shifts/{shift}', [ShiftController::class, 'update'])->middleware('permission:staff.schedule')->whereUuid('shift')->name('shifts.update');
+        Route::post('shifts/{shift}/cancel', [ShiftController::class, 'cancel'])->middleware('permission:staff.schedule')->whereUuid('shift')->name('shifts.cancel');
+        Route::put('shifts/{shift}/attendance', [ShiftController::class, 'correctAttendance'])->middleware('permission:staff.schedule')->whereUuid('shift')->name('shifts.attendance');
+
+        Route::get('attendance', [AttendanceController::class, 'index'])->middleware('permission:staff.view|staff.schedule')->name('attendance.index');
+        Route::get('attendance/summary', [AttendanceController::class, 'summary'])->middleware('permission:staff.view|staff.schedule')->name('attendance.summary');
+        Route::get('attendance/export', [AttendanceController::class, 'export'])->middleware('permission:staff.view|staff.schedule')->name('attendance.export');
+
+        // Every staff member: own shifts and clocking (P25, P28).
+        Route::get('my-shifts', [MyShiftController::class, 'index'])->name('my-shifts.index');
+        Route::post('my-shifts/{shift}/clock-in', [MyShiftController::class, 'clockIn'])->middleware('throttle:30,1')->whereUuid('shift')->name('my-shifts.clock-in');
+        Route::post('my-shifts/{shift}/clock-out', [MyShiftController::class, 'clockOut'])->middleware('throttle:30,1')->whereUuid('shift')->name('my-shifts.clock-out');
+
+        // Reports (M4)
+        Route::get('reports/summary', [ReportController::class, 'summary'])->middleware('permission:reports.view')->name('reports.summary');
+        Route::get('reports/export', [ReportController::class, 'export'])->middleware('permission:reports.export')->name('reports.export');
 
         // Payments & receipts
         Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view')->name('payments.index');

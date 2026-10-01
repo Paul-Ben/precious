@@ -32,6 +32,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         apiPrefix: 'api/v1',
     )
+    // Reverb channel authorisation at /api/v1/broadcasting/auth (M4).
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', [
+        'prefix' => 'api/v1',
+        'middleware' => ['auth:sanctum', 'active', 'two_factor'],
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 

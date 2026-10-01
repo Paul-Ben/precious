@@ -3,6 +3,7 @@
 namespace App\Domain\Payments;
 
 use App\Domain\Audit\AuditService;
+use App\Domain\Finance\DayLock;
 use App\Domain\Payments\Gateways\GatewayException;
 use App\Domain\Payments\Gateways\VerificationResult;
 use App\Domain\Property\HotelSettings;
@@ -436,6 +437,9 @@ class PaymentService
         $minor = Money::toMinor($data['amount']);
 
         [$payment, $receipt] = DB::transaction(function () use ($reservation, $data, $method, $minor, $actor) {
+            // P33: inside the transaction so a concurrent day closing cannot miss this payment.
+            app(DayLock::class)->assertTodayOpen('This payment');
+
             /** @var Reservation $locked */
             $locked = Reservation::query()->whereKey($reservation->id)->lockForUpdate()->firstOrFail();
 
@@ -711,6 +715,9 @@ class PaymentService
         $minor = Money::toMinor($data['amount']);
 
         [$payment, $receipt] = DB::transaction(function () use ($tab, $data, $method, $minor, $actor) {
+            // P33: inside the transaction so a concurrent day closing cannot miss this payment.
+            app(DayLock::class)->assertTodayOpen('This payment');
+
             /** @var BarTab $locked */
             $locked = BarTab::query()->whereKey($tab->id)->lockForUpdate()->firstOrFail();
             $balance = $locked->balanceMinor();

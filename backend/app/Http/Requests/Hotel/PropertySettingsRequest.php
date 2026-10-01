@@ -46,6 +46,7 @@ class PropertySettingsRequest extends FormRequest
             'policies.pass_gateway_fees_to_customer' => ['sometimes', 'boolean'],
             'policies.require_id_at_check_in' => ['sometimes', 'boolean'],
             'policies.refund_second_approval_above' => ['sometimes', 'string', 'regex:/^\d{1,11}(\.\d{1,2})?$/'],
+            'policies.expense_approval_above' => ['sometimes', 'string', 'regex:/^\d{1,11}(\.\d{1,2})?$/'],
         ];
     }
 }

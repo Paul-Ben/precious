@@ -25,3 +25,6 @@ Schedule::command('reservations:mark-no-shows')->dailyAt('23:59')->withoutOverla
 
 // Settle online payments whose redirect and webhook never arrived (spec §15).
 Schedule::command('payments:reconcile')->everyTenMinutes()->withoutOverlapping();
+
+// P26: absent when nobody clocked in by the shift end; forgotten clock-outs closed and flagged.
+Schedule::command('shifts:close-attendance')->everyFiveMinutes()->withoutOverlapping();

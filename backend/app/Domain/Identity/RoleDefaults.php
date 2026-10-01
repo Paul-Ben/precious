@@ -43,7 +43,7 @@ final class RoleDefaults
                     'bar.orders.view', 'bar.orders.cancel', 'bar.orders.charge_to_room',
                     'bills.view', 'bills.update', 'discounts.apply', 'discounts.approve',
                     'payments.view', 'payments.create',
-                    'finance.view', 'finance.reports',
+                    'finance.view', 'finance.reports', 'finance.expenses', 'finance.expenses.approve', 'finance.close_day',
                     'staff.view', 'staff.create', 'staff.update', 'staff.schedule',
                     'inventory.view',
                     'reports.view', 'reports.export',
@@ -67,7 +67,7 @@ final class RoleDefaults
                 'permissions' => [
                     'bills.view',
                     'payments.view', 'payments.create', 'payments.refund',
-                    'finance.view', 'finance.reports', 'finance.expenses',
+                    'finance.view', 'finance.reports', 'finance.expenses', 'finance.close_day',
                     'reports.view', 'reports.export',
                 ],
             ],

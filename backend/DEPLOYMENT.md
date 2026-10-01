@@ -42,7 +42,17 @@ php artisan migrate --force && php artisan db:seed --class=Database\\Seeders\\Co
 `DB_*` (from Railway), `REDIS_*`, `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`,
 `MAIL_MAILER=resend`, `RESEND_API_KEY`, `MAIL_FROM_ADDRESS`, `R2_*`,
 `MEDIA_DISK=r2_public`, `DOCUMENTS_DISK=r2_private`,
-`SUPER_ADMIN_EMAIL` (first deploy only), `LOG_CHANNEL=stderr`.
+`SUPER_ADMIN_EMAIL` (first deploy only), `LOG_CHANNEL=stderr`,
+`BROADCAST_CONNECTION=reverb`, `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`
+(random, shared by `api`, `worker` and `reverb`), `REVERB_HOST` / `REVERB_PORT=443` /
+`REVERB_SCHEME=https` (the public websocket domain, used by `api` to publish), and for the
+`reverb` service `REVERB_SERVER_HOST=0.0.0.0`, `REVERB_SERVER_PORT=$PORT`.
+
+The `web` service needs `NEXT_PUBLIC_REVERB_APP_KEY`, `NEXT_PUBLIC_REVERB_HOST` (the reverb
+service's public domain), `NEXT_PUBLIC_REVERB_PORT=443`, `NEXT_PUBLIC_REVERB_SCHEME=https`
+at **build** time (they are baked into the browser bundle).
+
+The `worker` service is required from M4: customer emails are queued.
 
 The `scheduler` service is required from M2: it expires unpaid booking holds every minute and
 reconciles pending online payments every 10 minutes.

@@ -20,7 +20,7 @@ Prerequisites: Node 22 (see `.nvmrc`) and the backend running (e.g. `http://prec
 ```powershell
 cd "C:\Users\O D G\Herd\precious\frontend"
 npm install
-copy .env.example .env.local     # set API_BASE_URL to your backend
+copy .env.example .env.local     # set API_BASE_URL to your backend; NEXT_PUBLIC_REVERB_* must match the backend REVERB_* values
 npm run dev                       # http://localhost:3000
 ```
 

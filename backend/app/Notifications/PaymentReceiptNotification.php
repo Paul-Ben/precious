@@ -5,11 +5,16 @@ namespace App\Notifications;
 use App\Models\Receipt;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PaymentReceiptNotification extends Notification
+/** Queued: sent by the queue worker so a slow mail provider never delays the desk. */
+class PaymentReceiptNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     public function __construct(public readonly Receipt $receipt) {}
 
     public function via(object $notifiable): array

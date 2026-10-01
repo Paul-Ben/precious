@@ -75,12 +75,24 @@ herd link precious-api        # -> http://precious-api.test
 curl http://precious-api.test/api/v1/health
 ```
 
+Live updates use Laravel Reverb (from M4). Install it once:
+
+```powershell
+composer require laravel/reverb
+```
+
+and keep `BROADCAST_CONNECTION=reverb` plus the `REVERB_*` values from `.env.example` in `.env`
+(the frontend's `NEXT_PUBLIC_REVERB_*` values must match).
+
 Background work (run in separate terminals while developing):
 
 ```powershell
-php artisan queue:listen --tries=1
-php artisan schedule:work     # expires unpaid holds, marks no-shows, reconciles payments
+php artisan queue:work --tries=1     # sends emails (receipts, bills) - restart it after code changes
+php artisan schedule:work            # expires unpaid holds, marks no-shows, reconciles payments
+php artisan reverb:start             # websocket server for the live bar queue and bills
 ```
+
+Without Reverb running the bar screens still work - they fall back to refreshing every few seconds.
 
 ### Trying online payments locally
 

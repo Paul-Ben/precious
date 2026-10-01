@@ -115,3 +115,55 @@ change before the milestone that needs it.
 | A32 | Charge to room needs `bar.orders.charge_to_room`, all orders delivered and nothing paid yet; the whole bill moves to the guest's hotel bill as a BAR line (not voidable there — use a reduction). The match is room number + any guest surname on a checked-in booking; errors don't reveal who is in a room | `TabService::chargeToRoom` |
 | A33 | Stock tracking stays off (P11); products have a sold-out switch that bartenders can use | `bar/products/{id}/availability` |
 | A34 | Live bartender/waiter updates poll every 4–10 s; Reverb push (events already emitted) is switched on in M4 | `BarOrderChanged` |
+
+## Implemented in M4 on assumption
+
+| # | Assumption | Where |
+|---|---|---|
+| A35 | Report definitions. **Days** are hotel calendar days (property time zone). **Room nights** = active booked room-nights of CONFIRMED / CHECKED_IN / CHECKED_OUT bookings falling in the range (a no-show or cancellation is not a sold night). **Occupancy** = room nights ÷ (active rooms × days). **Room revenue** = nightly rate × nights, before VAT/service charge; **ADR** = room revenue ÷ room nights; **RevPAR** = room revenue ÷ available room-nights. **Bar sales** = closed bills' items less discounts, before service charge and VAT, dated by close time (bills charged to rooms included, and not double-counted as hotel extras). **Money received** = successful payments by paid time, excluding gateway fees paid by the guest; refunds by completion time | `ReportService` |
+| A36 | Reports are read-only views of live data (no snapshots); range up to one year; CSV exports are audited (`reports.exported`) and guard against spreadsheet formulas | `ReportController` |
+| A37 | Realtime: one private `bar` channel for all staff who can view, prepare or take bar orders; screens poll slowly (≥30 s) while connected and fall back to fast polling if the socket drops or Reverb isn't configured | `routes/channels.php`, `useBarRealtime` |
+| A38 | Customer emails (receipts, final bill, bar bill) are queued; `emailed_at` records when the email was queued | notifications |
+
+## Staff & shift rules — confirmed 1 Oct 2026
+
+| # | Rule | Where |
+|---|---|---|
+| P23 | Every staff login has a staff record: employee number (EMP-0001, never reused), department, position, status (Active / On leave / Left), start date, photo, emergency contact, notes. Marking someone **Left** blocks their sign-in and cancels their future shifts. One person can hold several roles | `StaffService` |
+| P24 | Standard shifts Morning 07–15, Afternoon 15–23, Night 23–07, plus any custom times. A shift ending at or before its start time ends the next day. An assignment is person + date + times + department + location + status. One person cannot hold overlapping shifts (also a database constraint). Managers can copy last week's rota | `ShiftService`, `shifts_no_overlap` |
+| P25 | Staff clock in and out on **My shifts**. Clock-in opens 30 minutes before the start; more than 10 minutes after the start is **Late**. Managers record or correct attendance with a reason (audited) | `ShiftService::clockIn`, `correct` |
+| P26 | No clock-in by the end of the shift = **Absent**. Still clocked in 4 hours after the end = clocked out at the shift end and flagged for the manager | `shifts:close-attendance` (every 5 min) |
+| P27 | Emails when a shift is assigned, changed (time or place) or cancelled, only for shifts that have not started | `ShiftNotification` (queued) |
+| P28 | Staff see their own shifts and who overlaps them; managers see the weekly rota; attendance report with hours per person and CSV — no pay or payroll | `MyShiftController`, `AttendanceController` |
+
+## Implemented in M5 on assumption
+
+| # | Assumption | Where |
+|---|---|---|
+| A39 | Attendance statuses are CLOCKED_IN / CLOCKED_OUT / ABSENT with a separate **late** flag and minutes (spec §31 lists LATE as a status; a late person is also clocked in) | `attendance_records` |
+| A40 | A shift that has started keeps its person, date and times; only place and notes change, and attendance is corrected instead. Started shifts cannot be cancelled | `ShiftService::update`, `cancel` |
+| A41 | Changing a standard shift's times does not move shifts already on the rota; deleting one keeps them | `ShiftTemplateController` |
+| A42 | Shifts are at most 16 hours. Copying a week skips clashes, people who have left, and days already started | `ShiftService` |
+| A43 | Staff photos are private files (documents disk), shown only to people with `staff.view`/`staff.schedule`; address, emergency contact and notes need `staff.view` | `StaffController`, `StaffResource` |
+| A44 | Clock-in/out times, late and absent counts are hotel time; reports count shifts that have started | `AttendanceController` |
+
+## Finance rules — confirmed 4 Oct 2026
+
+| # | Rule | Where |
+|---|---|---|
+| P29 | Expenses: date, category, description, amount, supplier/payee, payment method (cash, transfer, POS/card, cheque), reference, optional receipt photo/PDF. Ten standard categories; managers add more or hide them | `ExpenseService`, `expense_categories` |
+| P30 | Expenses up to ₦50,000 (`expense_approval_above`) count at once; above it they wait for the Hotel Manager or an Administrator, never the person who recorded them. Rejections keep their reason | `ExpenseService::decide` |
+| P31 | Pending expenses can be edited; approved ones can only be voided with a reason. Everything is audited | `ExpenseService` |
+| P32 | Cash view: revenue = money received (excluding gateway fees guests pay on top) less refunds, split hotel / bar; expenses by expense date; net position = revenue − approved expenses | `FinanceService::summary` |
+| P33 | Daily closing: expected money by method, cash counted, difference with a note. A closed day's desk payments, cash refunds and cash expenses are locked; corrections go into an open day. Only an Administrator reopens, with a reason | `FinanceService::close`, `DayLock` |
+| P34 | Reports: revenue, payments, refunds, outstanding bills, expenses by category, daily closing, monthly summary — CSV and Excel downloads; daily closing and the summary print to PDF from the browser | `FinanceController::export`, `Spreadsheet` |
+
+## Implemented in M6 on assumption
+
+| # | Assumption | Where |
+|---|---|---|
+| A45 | Payments are not split between rooms and services (a payment covers the whole bill), so revenue is split hotel / bar; the rooms / services / bar split is shown as amounts *billed* in the period | `FinanceService::summary` |
+| A46 | Expected cash subtracts every cash expense that is pending or approved (the money has left the drawer); rejecting a pending cash expense on a closed day is blocked | `FinanceService::day`, `ExpenseService::decide` |
+| A47 | Online payments and gateway-dashboard refunds are never blocked by a closed day (they happen outside the desk) | `DayLock` |
+| A48 | Outstanding bills = checked-in and checked-out reservations with a balance, and open bar bills with money owed; confirmed future bookings with only a deposit are not "owed" yet | `FinanceService::outstanding` |
+| A49 | New permissions: `finance.expenses.approve` (Hotel Manager, Administrator), `finance.close_day` (Accountant, Hotel Manager, Administrator), `finance.reopen_day` (Administrator); Hotel Manager also gets `finance.expenses` | migration `2026_10_05_000100` |

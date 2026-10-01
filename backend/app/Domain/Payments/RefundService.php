@@ -3,6 +3,7 @@
 namespace App\Domain\Payments;
 
 use App\Domain\Audit\AuditService;
+use App\Domain\Finance\DayLock;
 use App\Domain\Property\HotelSettings;
 use App\Domain\Reservations\ReservationLedger;
 use App\Enums\RefundMethod;
@@ -129,6 +130,11 @@ class RefundService
         return $this->transition($refund, function (Refund $locked) use ($actor, $method, $externalReference) {
             if ($locked->status !== RefundStatus::Approved) {
                 throw new BusinessRuleException('Only approved refunds can be completed.', 'INVALID_STATUS', 422);
+            }
+
+            // P33: money paid out by hand belongs to today, which must still be open.
+            if ($method !== RefundMethod::GatewayDashboard) {
+                app(DayLock::class)->assertTodayOpen('This refund');
             }
 
             /** @var Payment $payment */

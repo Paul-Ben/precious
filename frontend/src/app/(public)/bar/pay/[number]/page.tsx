@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LoadingState } from "@/components/ui/states";
 import { PublicBarPay } from "@/features/bar/public-pay";
 
-export const metadata: Metadata = { title: "Pay your bill", robots: { index: false } };
+export const metadata: Metadata = { title: "Pay your bill", robots: { index: false }, referrer: "no-referrer" };
 
 export default async function Page({ params }: PageProps<"/bar/pay/[number]">) {
   const { number } = await params;

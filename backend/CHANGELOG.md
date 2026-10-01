@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.8.0] — 2026-10-05 — M6 Finance
+
+### Added
+- Expenses with categories, receipts, approval above ₦50,000 by someone else (P29–P31).
+- Finance summary: revenue received, refunds, expenses by category, net position, daily rows (P32).
+- Daily closing with cash count, difference note, locked days and admin reopen (P33); desk
+  payments, cash refunds and cash expenses are refused on closed days.
+- Outstanding bills; CSV and Excel exports for summary, expenses, refunds and outstanding (P34).
+- New permissions `finance.expenses.approve`, `finance.close_day`, `finance.reopen_day`
+  (granted by migration). 12 new tests (225 total).
+
+## [0.7.0] — 2026-10-04 — M5 Staff & shifts
+
+### Added
+- Staff records for every staff login (EMP-0001 numbers, department, position, status, dates,
+  emergency contact, notes, private photo). Marking someone Left blocks sign-in and cancels
+  future shifts (P23).
+- Standard shifts (Morning / Afternoon / Night) and custom times; overnight shifts; no
+  overlapping shifts per person (database constraint); copy a week (P24).
+- Clock in / out from My shifts with a 30-minute early window and 10-minute late grace (P25);
+  absent and forgotten clock-outs handled by `shifts:close-attendance` every 5 minutes (P26).
+- Shift emails on assign / change / cancel (P27); attendance summary and CSV (P28).
+- 18 new tests (213 total).
+
+## [0.6.0] — 2026-10-03 — M4 Realtime & reports
+
+### Added
+- Laravel Reverb: private `bar` channel (`routes/channels.php`), broadcasting auth at
+  `/api/v1/broadcasting/auth` (Sanctum + active + 2FA); `BarOrderChanged` now pushes live.
+- Reports: `GET /reports/summary` (occupancy, room revenue, ADR, RevPAR, bar sales, top
+  products, waiters, payments by method, daily rows) and CSV exports for payments, bar bills
+  and reservations (`reports.export`, audited).
+- 4 new tests (195 total).
+
+### Changed
+- Receipt, final-bill and bar-bill emails are queued (run a queue worker).
+- `payments` rate limit raised to 30/min; guests no longer see internal fields on bill lines.
+
 ## [0.5.0] — 2026-10-02 — M3 Bar / POS
 
 ### Added

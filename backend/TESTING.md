@@ -72,6 +72,28 @@ Stay tests freeze time (`travelTo`) at fixed hotel-time moments so late fees are
 | `Feature/Bar/BarSettlementTest` | Close rules (pending orders, balance), desk payment + receipt + cash-up, empty bill, P9 charge to room (surname/room checks, hotel bill line), customer pay link via Paystack |
 | `Feature/Bar/BarCatalogTest` | Menu and tables admin, waiter read-only, table with open bill |
 
+## Added in M4 (+4 tests, 195 total)
+
+| Suite | Covers |
+|---|---|
+| `Feature/Reports/ReportsTest` | Occupancy, room revenue, ADR/RevPAR, bar sales and top products, payments by method, daily rows, range clipping, CSV exports (bar bills, payments, reservations), permissions, range validation |
+
+## Added in M5 (+18 tests, 213 total)
+
+| Suite | Covers |
+|---|---|
+| `Feature/Staff/StaffRecordsTest` | Employee numbers (existing and new accounts), editing records, P23 leaving (sign-in blocked, future shifts cancelled), private photos, permissions |
+| `Feature/Staff/ShiftTest` | Standard and overnight shifts, P24 overlaps, P27 emails on assign/change/reassign/cancel, started shifts locked, copy week, permissions |
+| `Feature/Staff/AttendanceTest` | P25 clock-in window and lateness, P28 colleagues, P26 absent + auto clock-out, manager corrections with reason, summary hours and CSV |
+
+## Added in M6 (+12 tests, 225 total)
+
+| Suite | Covers |
+|---|---|
+| `Feature/Finance/ExpensesTest` | P29/P30 auto-approval up to the limit, approval by someone else, rejection, P31 edit vs void, validation, private receipts, permissions |
+| `Feature/Finance/DailyClosingTest` | P33 expected cash by method (pending cash expenses included), note on differences, locked day (cash expenses, voids, desk payments), admin-only reopen, closing again |
+| `Feature/Finance/FinanceReportsTest` | P32 revenue / expenses / net position and days, outstanding bills, P34 CSV and Excel exports, permissions |
+
 ## Conventions
 
 * One behaviour per test, named as a sentence.

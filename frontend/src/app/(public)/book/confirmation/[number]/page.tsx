@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BookingConfirmation } from "@/features/booking/booking-confirmation";
 
-export const metadata: Metadata = { title: "Reservation", robots: { index: false } };
+export const metadata: Metadata = { title: "Reservation", robots: { index: false }, referrer: "no-referrer" };
 
 export default async function ConfirmationPage({ params }: PageProps<"/book/confirmation/[number]">) {
   const { number } = await params;

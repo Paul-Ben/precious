@@ -3,6 +3,7 @@
 namespace App\Domain\Identity;
 
 use App\Domain\Audit\AuditService;
+use App\Domain\Staff\StaffService;
 use App\Enums\UserStatus;
 use App\Enums\UserType;
 use App\Exceptions\BusinessRuleException;
@@ -48,6 +49,9 @@ class UserService
             ]);
 
             $user->syncRoles($roles);
+
+            // P23: every staff login gets a staff record with an employee number.
+            app(StaffService::class)->ensureProfile($user);
 
             $this->audit->record('users.created', $user, new: [
                 'name' => $user->name,

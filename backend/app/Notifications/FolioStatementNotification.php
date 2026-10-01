@@ -5,11 +5,16 @@ namespace App\Notifications;
 use App\Models\FolioStatement;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class FolioStatementNotification extends Notification
+/** Queued: sent by the queue worker so a slow mail provider never delays the desk. */
+class FolioStatementNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     public function __construct(public readonly FolioStatement $statement) {}
 
     public function via(object $notifiable): array

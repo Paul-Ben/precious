@@ -83,6 +83,9 @@ final class PermissionCatalog
                 'finance.view' => 'View finance dashboard',
                 'finance.reports' => 'View financial reports',
                 'finance.expenses' => 'Record and manage expenses',
+                'finance.expenses.approve' => 'Approve or reject expenses above the approval limit',
+                'finance.close_day' => 'Close the day (daily closing and cash count)',
+                'finance.reopen_day' => 'Reopen a closed day',
             ],
             'staff' => [
                 'staff.view' => 'View staff records',

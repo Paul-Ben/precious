@@ -38,7 +38,7 @@ export function TabBill({ tab: t, onClosed }: { tab: BarTab; onClosed?: () => vo
     mutationFn: () => barApi.close(t.id),
     onSuccess: async () => {
       await refresh();
-      await queryClient.invalidateQueries({ queryKey: barKeys.tables });
+      await queryClient.invalidateQueries({ queryKey: ["bar"] });
       onClosed?.();
     },
   });
@@ -178,7 +178,7 @@ function RoomChargeDialog({ tab, onClose }: { tab: BarTab; onClose: () => void }
     mutationFn: () => barApi.chargeToRoom(tab.id, room.trim(), surname.trim()),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: barKeys.tab(tab.id) });
-      await queryClient.invalidateQueries({ queryKey: barKeys.tables });
+      await queryClient.invalidateQueries({ queryKey: ["bar"] });
     },
   });
 
